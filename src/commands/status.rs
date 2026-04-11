@@ -81,13 +81,14 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
         println!("{}", marker_label);
         println!(
             "obligations: {} total, {} critical, {} open critical\n",
-            r.obligations_total,
-            r.obligations_critical,
-            r.obligations_open_critical
+            r.obligations_total, r.obligations_critical, r.obligations_open_critical
         );
 
         if r.obligations.is_empty() {
-            println!("  {} no obligations yet — add one with `ritalin add`", "·".dimmed());
+            println!(
+                "  {} no obligations yet — add one with `ritalin add`",
+                "·".dimmed()
+            );
             return;
         }
 

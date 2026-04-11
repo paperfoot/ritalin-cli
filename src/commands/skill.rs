@@ -48,8 +48,7 @@ pub fn install(ctx: Ctx) -> Result<(), AppError> {
     let mut results: Vec<InstallResult> = Vec::new();
     for target in &skill_targets() {
         let skill_path = target.path.join("SKILL.md");
-        if skill_path.exists()
-            && std::fs::read_to_string(&skill_path).is_ok_and(|c| c == SKILL_MD)
+        if skill_path.exists() && std::fs::read_to_string(&skill_path).is_ok_and(|c| c == SKILL_MD)
         {
             results.push(InstallResult {
                 platform: target.name.into(),
@@ -95,8 +94,7 @@ pub fn status(ctx: Ctx) -> Result<(), AppError> {
     for target in &skill_targets() {
         let skill_path = target.path.join("SKILL.md");
         let (installed, current) = if skill_path.exists() {
-            let current =
-                std::fs::read_to_string(&skill_path).is_ok_and(|c| c == SKILL_MD);
+            let current = std::fs::read_to_string(&skill_path).is_ok_and(|c| c == SKILL_MD);
             (true, current)
         } else {
             (false, false)

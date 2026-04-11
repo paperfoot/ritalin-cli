@@ -2,11 +2,11 @@ use std::path::Path;
 
 use crate::error::AppError;
 
-/// The .task-incomplete marker file.
-///
-/// Default state: present (created by `ritalin init`). Removed only by `gate`
-/// after every critical obligation has passing evidence. Hooks and humans can
-/// inspect this file as a quick "is the agent done?" check.
+// The .task-incomplete marker file.
+//
+// Default state: present (created by `ritalin init`). Removed only by `gate`
+// after every critical obligation has passing evidence. Hooks and humans can
+// inspect this file as a quick "is the agent done?" check.
 
 pub fn marker_path(state_dir: &Path) -> std::path::PathBuf {
     // The marker lives at the *parent* of the .ritalin/ dir so it shows up

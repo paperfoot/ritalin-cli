@@ -12,7 +12,6 @@
 ///
 /// Why YAML for scope? Humans (and agents) read and write it directly;
 /// JSON's lack of comments makes it hostile to in-line acceptance criteria.
-
 pub mod evidence;
 pub mod marker;
 pub mod obligations;

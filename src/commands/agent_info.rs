@@ -1,7 +1,7 @@
-/// Machine-readable capability manifest.
-///
-/// Always JSON — agents call this to bootstrap. Uses its own schema (not the
-/// envelope) because this IS the schema definition.
+// Machine-readable capability manifest.
+//
+// Always JSON — agents call this to bootstrap. Uses its own schema (not the
+// envelope) because this IS the schema definition.
 
 pub fn run() {
     let info = serde_json::json!({

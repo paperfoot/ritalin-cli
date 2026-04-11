@@ -6,7 +6,6 @@
 ///   - --json flag: force JSON even in terminal
 ///   - --quiet flag: suppress human informational output (errors always print)
 ///   - All JSON serialization is panic-safe via safe_json_string()
-
 use serde::Serialize;
 use std::io::IsTerminal;
 

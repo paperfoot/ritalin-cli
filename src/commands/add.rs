@@ -34,7 +34,9 @@ pub fn run(
     }
     let proof = proof.trim().to_string();
     if proof.is_empty() {
-        return Err(AppError::InvalidInput("proof command cannot be empty".into()));
+        return Err(AppError::InvalidInput(
+            "proof command cannot be empty".into(),
+        ));
     }
 
     let id = obligations::next_id(&dir)?;
@@ -63,7 +65,13 @@ pub fn run(
         } else {
             "[advisory]".dimmed().to_string()
         };
-        println!("{} {} {} {}", "+".green().bold(), r.id.bold(), crit, r.claim);
+        println!(
+            "{} {} {} {}",
+            "+".green().bold(),
+            r.id.bold(),
+            crit,
+            r.claim
+        );
         println!("  proof: {}", r.proof_cmd.dimmed());
     });
 

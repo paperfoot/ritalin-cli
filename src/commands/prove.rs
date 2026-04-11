@@ -70,7 +70,12 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
         } else {
             "FAIL".red().bold().to_string()
         };
-        println!("{} {} (exit {})", badge, r.obligation_id.bold(), r.exit_code);
+        println!(
+            "{} {} (exit {})",
+            badge,
+            r.obligation_id.bold(),
+            r.exit_code
+        );
         println!("  cmd: {}", r.command.dimmed());
         if !r.stderr_tail.is_empty() {
             println!("  stderr: {}", r.stderr_tail.dimmed());

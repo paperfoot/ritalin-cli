@@ -42,7 +42,11 @@ impl AppError {
         match self {
             Self::NotInitialized | Self::ScopeMissing => 2,
             Self::UnknownObligation(_) | Self::InvalidInput(_) => 3,
-            Self::VerificationFailed(_) | Self::Io(_) | Self::Yaml(_) | Self::Json(_) | Self::Update(_) => 1,
+            Self::VerificationFailed(_)
+            | Self::Io(_)
+            | Self::Yaml(_)
+            | Self::Json(_)
+            | Self::Update(_) => 1,
         }
     }
 
