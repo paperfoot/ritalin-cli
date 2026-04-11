@@ -17,6 +17,7 @@
 mod cli;
 mod commands;
 mod error;
+mod gate_eval;
 mod ledger;
 mod output;
 
@@ -68,6 +69,7 @@ fn main() {
         } => commands::add::run(ctx, claim, proof, kind, critical),
         Commands::Prove { id, cmd } => commands::prove::run(ctx, id, cmd),
         Commands::Gate { hook_mode } => commands::gate::run(ctx, hook_mode),
+        Commands::Seed { manifest, force } => commands::seed::run(ctx, manifest, force),
         Commands::Status => commands::status::run(ctx),
         Commands::AgentInfo => {
             commands::agent_info::run();

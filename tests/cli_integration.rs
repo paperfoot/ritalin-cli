@@ -284,3 +284,67 @@ fn json_output_has_envelope() {
     assert_eq!(json["status"], "success");
     assert!(json["data"].is_object());
 }
+
+#[test]
+fn gate_json_fail_emits_single_envelope() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    // prove (fails, records evidence)
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .failure();
+
+    let output = ritalin()
+        .args(["gate", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    // stdout should have exactly one JSON document with status "fail"
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(json["version"], "1");
+    assert_eq!(json["status"], "fail");
+    assert_eq!(json["data"]["verdict"], "fail");
+    assert!(json["data"]["obligations_open_critical"].as_u64().unwrap() > 0);
+
+    // stderr should be empty (no duplicate error envelope)
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.trim().is_empty(),
+        "stderr should be empty but got: {stderr}"
+    );
+}
+
+#[test]
+fn gate_json_pass_emits_success_envelope() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "must pass", "true");
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    let output = ritalin()
+        .args(["gate", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(json["version"], "1");
+    assert_eq!(json["status"], "success");
+    assert_eq!(json["data"]["verdict"], "pass");
+}

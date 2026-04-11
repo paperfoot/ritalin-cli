@@ -98,6 +98,15 @@ pub enum Commands {
         hook_mode: bool,
     },
 
+    /// Seed a contract from a TOML/YAML manifest file
+    Seed {
+        /// Path to the manifest file (TOML or YAML)
+        manifest: String,
+        /// Overwrite an existing contract
+        #[arg(long)]
+        force: bool,
+    },
+
     /// Show current scope, obligations, and evidence
     Status,
 

@@ -1,18 +1,8 @@
-//! The completion gate. This is the load-bearing piece.
-//!
-//! When called as a Claude Code Stop hook with `--hook-mode`, it reads
-//! `stop_hook_active` from stdin to prevent infinite loops, then either
-//! emits a `{"decision": "block", "reason": "..."}` JSON to stdout
-//! (which Claude Code interprets as "keep working") or exits cleanly
-//! to allow the stop.
-//!
-//! When called from a terminal without `--hook-mode`, it returns the
-//! framework JSON envelope or a coloured human report.
-
 use serde::Serialize;
 use std::io::{IsTerminal, Read};
 
 use crate::error::AppError;
+use crate::gate_eval::{self, Verdict};
 use crate::ledger::{evidence, is_initialized, marker, obligations, state_dir, workspace_hash};
 use crate::output::{self, Ctx};
 
@@ -49,15 +39,12 @@ fn read_stop_hook_active() -> bool {
 }
 
 pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
-    // Critical: respect stop_hook_active to break out of forced-continuation cycles.
     if hook_mode && read_stop_hook_active() {
-        // Allow stop. Empty stdout = no decision = Claude Code stops normally.
         return Ok(());
     }
 
     let cwd = std::env::current_dir()?;
     if !is_initialized(&cwd) {
-        // Not initialized = nothing to enforce. Allow stop.
         if hook_mode {
             return Ok(());
         }
@@ -69,87 +56,87 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
     let evidence_index = evidence::index_by_obligation(&dir)?;
     let current_ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
 
-    let mut open_critical = Vec::new();
-    for ob in &obs {
-        if !ob.critical {
-            continue;
-        }
-        let expected_proof_hash = evidence::proof_hash(&ob.proof_cmd);
-        let discharged = evidence_index
-            .get(&ob.id)
-            .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, &current_ws_hash))
-            .unwrap_or(false);
-        if !discharged {
-            open_critical.push(ob);
-        }
-    }
+    let eval = gate_eval::evaluate(&obs, &evidence_index, &current_ws_hash);
 
-    if open_critical.is_empty() {
-        // PASS: every critical obligation has at least one passing proof.
-        marker::remove(&dir)?;
+    match eval.verdict {
+        Verdict::Pass => {
+            marker::remove(&dir)?;
 
-        if hook_mode {
-            // Claude Code: empty stdout = allow stop.
-            return Ok(());
+            if hook_mode {
+                return Ok(());
+            }
+
+            let result = GateResult {
+                verdict: "pass",
+                obligations_total: eval.obligations_total,
+                obligations_open_critical: 0,
+                blocking_obligation: None,
+                blocking_reason: None,
+            };
+            output::print_success_or(ctx, &result, |r| {
+                use owo_colors::OwoColorize;
+                println!(
+                    "{} all {} critical obligations discharged",
+                    "PASS".green().bold(),
+                    r.obligations_total
+                );
+                println!("  {} removed", ".task-incomplete".dimmed());
+            });
+            Ok(())
         }
-
-        let result = GateResult {
-            verdict: "pass",
-            obligations_total: obs.len(),
-            obligations_open_critical: 0,
-            blocking_obligation: None,
-            blocking_reason: None,
-        };
-        output::print_success_or(ctx, &result, |r| {
-            use owo_colors::OwoColorize;
-            println!(
-                "{} all {} critical obligations discharged",
-                "PASS".green().bold(),
-                r.obligations_total
+        Verdict::Fail => {
+            let blocking = eval.open_critical[0];
+            let reason = format!(
+                "Obligation {} ({}) lacks passing evidence. Run: `ritalin prove {} --cmd \"{}\"` (or fix the proof and re-run).",
+                blocking.id, blocking.claim, blocking.id, blocking.proof_cmd
             );
-            println!("  {} removed", ".task-incomplete".dimmed());
-        });
-        return Ok(());
-    }
 
-    // FAIL: at least one critical obligation lacks evidence.
-    let blocking = open_critical[0];
-    let reason = format!(
-        "Obligation {} ({}) lacks passing evidence. Run: `ritalin prove {} --cmd \"{}\"` (or fix the proof and re-run).",
-        blocking.id, blocking.claim, blocking.id, blocking.proof_cmd
-    );
+            if hook_mode {
+                let decision = StopHookDecision {
+                    decision: "block",
+                    reason: reason.clone(),
+                };
+                println!("{}", output::safe_json_string(&decision));
+                return Ok(());
+            }
 
-    if hook_mode {
-        // Emit Claude Code stop hook JSON. Stdout JSON is what triggers the block.
-        let decision = StopHookDecision {
-            decision: "block",
-            reason: reason.clone(),
-        };
-        // Hook output goes through stdout regardless of TTY detection — Claude Code reads it.
-        println!("{}", output::safe_json_string(&decision));
-        return Ok(());
-    }
+            let result = GateResult {
+                verdict: "fail",
+                obligations_total: eval.obligations_total,
+                obligations_open_critical: eval.open_critical.len(),
+                blocking_obligation: Some(blocking.id.clone()),
+                blocking_reason: Some(reason.clone()),
+            };
 
-    let result = GateResult {
-        verdict: "fail",
-        obligations_total: obs.len(),
-        obligations_open_critical: open_critical.len(),
-        blocking_obligation: Some(blocking.id.clone()),
-        blocking_reason: Some(reason.clone()),
-    };
-    output::print_success_or(ctx, &result, |r| {
-        use owo_colors::OwoColorize;
-        println!(
-            "{} {} of {} critical obligations open",
-            "FAIL".red().bold(),
-            r.obligations_open_critical,
-            r.obligations_total
-        );
-        if let Some(reason) = &r.blocking_reason {
-            println!("  {}", reason.dimmed());
+            // For JSON mode, emit one fail envelope to stdout and exit directly.
+            // This avoids the double-output problem where print_success_or emits
+            // a "success" envelope and then main.rs emits an "error" envelope.
+            match ctx.format {
+                output::Format::Json => {
+                    let envelope = serde_json::json!({
+                        "version": "1",
+                        "status": "fail",
+                        "data": result,
+                    });
+                    println!("{}", output::safe_json_string(&envelope));
+                    std::process::exit(1);
+                }
+                output::Format::Human => {
+                    if !ctx.quiet {
+                        use owo_colors::OwoColorize;
+                        println!(
+                            "{} {} of {} critical obligations open",
+                            "FAIL".red().bold(),
+                            result.obligations_open_critical,
+                            result.obligations_total
+                        );
+                        if let Some(reason) = &result.blocking_reason {
+                            println!("  {}", reason.dimmed());
+                        }
+                    }
+                    Err(AppError::VerificationFailed(reason))
+                }
+            }
         }
-    });
-
-    // Non-zero exit when called from CLI so users see it failed.
-    Err(AppError::VerificationFailed(reason))
+    }
 }
