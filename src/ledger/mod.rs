@@ -16,6 +16,7 @@ pub mod evidence;
 pub mod marker;
 pub mod obligations;
 pub mod scope;
+pub mod workspace_hash;
 
 use std::path::{Path, PathBuf};
 

@@ -59,7 +59,7 @@ fn main() {
     let ctx = Ctx::new(cli.json, cli.quiet);
 
     let result = match cli.command {
-        Commands::Init { outcome } => commands::init::run(ctx, outcome),
+        Commands::Init { outcome, force } => commands::init::run(ctx, outcome, force),
         Commands::Add {
             claim,
             proof,

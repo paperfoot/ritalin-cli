@@ -68,3 +68,76 @@ pub fn find(state_dir: &Path, id: &str) -> Result<Obligation, AppError> {
         .find(|o| o.id == id)
         .ok_or_else(|| AppError::UnknownObligation(id.into()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn make_obligation(id: &str) -> Obligation {
+        Obligation {
+            id: id.into(),
+            claim: "test claim".into(),
+            kind: ObligationKind::Other,
+            critical: true,
+            proof_cmd: "true".into(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn next_id_empty_ledger() {
+        let tmp = TempDir::new().unwrap();
+        assert_eq!(next_id(tmp.path()).unwrap(), "O-001");
+    }
+
+    #[test]
+    fn next_id_increments() {
+        let tmp = TempDir::new().unwrap();
+        append(tmp.path(), &make_obligation("O-001")).unwrap();
+        assert_eq!(next_id(tmp.path()).unwrap(), "O-002");
+        append(tmp.path(), &make_obligation("O-002")).unwrap();
+        assert_eq!(next_id(tmp.path()).unwrap(), "O-003");
+    }
+
+    #[test]
+    fn read_all_empty_file() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("obligations.jsonl"), "").unwrap();
+        assert!(read_all(tmp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn read_all_skips_blank_lines() {
+        let tmp = TempDir::new().unwrap();
+        let ob = make_obligation("O-001");
+        append(tmp.path(), &ob).unwrap();
+        let path = ledger_path(tmp.path());
+        let mut content = std::fs::read_to_string(&path).unwrap();
+        content.push_str("\n\n");
+        std::fs::write(&path, content).unwrap();
+        assert_eq!(read_all(tmp.path()).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn read_all_no_file() {
+        let tmp = TempDir::new().unwrap();
+        assert!(read_all(tmp.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn find_unknown_id_errors() {
+        let tmp = TempDir::new().unwrap();
+        assert!(find(tmp.path(), "O-999").is_err());
+    }
+
+    #[test]
+    fn find_existing_id() {
+        let tmp = TempDir::new().unwrap();
+        let ob = make_obligation("O-001");
+        append(tmp.path(), &ob).unwrap();
+        let found = find(tmp.path(), "O-001").unwrap();
+        assert_eq!(found.id, "O-001");
+        assert_eq!(found.claim, "test claim");
+    }
+}

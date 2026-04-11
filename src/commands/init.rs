@@ -11,7 +11,7 @@ struct InitResult {
     marker_created: bool,
 }
 
-pub fn run(ctx: Ctx, outcome: Option<String>) -> Result<(), AppError> {
+pub fn run(ctx: Ctx, outcome: Option<String>, force: bool) -> Result<(), AppError> {
     let outcome = outcome.unwrap_or_else(|| {
         "TODO: replace with one-line outcome (e.g. \"User can save and reload notification settings\")"
             .to_string()
@@ -19,6 +19,12 @@ pub fn run(ctx: Ctx, outcome: Option<String>) -> Result<(), AppError> {
 
     let cwd = std::env::current_dir()?;
     let dir = state_dir(&cwd);
+
+    if dir.exists() && !force {
+        return Err(AppError::InvalidInput(
+            "contract already exists — use --force to overwrite".into(),
+        ));
+    }
 
     let scope = Scope::new(outcome.clone());
     scope.write(&dir)?;

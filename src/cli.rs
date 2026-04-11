@@ -60,8 +60,11 @@ pub enum Commands {
     /// Initialize a ritalin scope contract in the current directory
     Init {
         /// One-line outcome statement (the user-facing thing being built)
-        #[arg(long)]
+        #[arg(long, short)]
         outcome: Option<String>,
+        /// Overwrite an existing contract
+        #[arg(long)]
+        force: bool,
     },
 
     /// Add a new obligation to the ledger
@@ -75,7 +78,7 @@ pub enum Commands {
         #[arg(long, value_enum, default_value = "other")]
         kind: ObligationKind,
         /// Mark as critical (gate blocks stop if open). Default true.
-        #[arg(long, default_value = "true")]
+        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
         critical: bool,
     },
 

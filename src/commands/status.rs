@@ -1,7 +1,9 @@
 use serde::Serialize;
 
 use crate::error::AppError;
-use crate::ledger::{evidence, is_initialized, marker, obligations, scope::Scope, state_dir};
+use crate::ledger::{
+    evidence, is_initialized, marker, obligations, scope::Scope, state_dir, workspace_hash,
+};
 use crate::output::{self, Ctx};
 
 #[derive(Serialize)]
@@ -36,12 +38,16 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
     let obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
 
+    let current_ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
     let mut entries: Vec<ObligationStatus> = Vec::with_capacity(obs.len());
     let mut critical_total = 0;
     let mut open_critical = 0;
     for ob in &obs {
         let recs = evidence_index.get(&ob.id);
-        let discharged = recs.map(|r| evidence::is_discharged(r)).unwrap_or(false);
+        let expected_ph = evidence::proof_hash(&ob.proof_cmd);
+        let discharged = recs
+            .map(|r| evidence::is_discharged(r, &expected_ph, &current_ws_hash))
+            .unwrap_or(false);
         let last_exit = recs.and_then(|r| r.last().map(|e| e.exit_code));
 
         if ob.critical {

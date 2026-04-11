@@ -13,7 +13,7 @@ use serde::Serialize;
 use std::io::{IsTerminal, Read};
 
 use crate::error::AppError;
-use crate::ledger::{evidence, is_initialized, marker, obligations, state_dir};
+use crate::ledger::{evidence, is_initialized, marker, obligations, state_dir, workspace_hash};
 use crate::output::{self, Ctx};
 
 #[derive(Serialize)]
@@ -67,15 +67,17 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
     let dir = state_dir(&cwd);
     let obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
+    let current_ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
 
     let mut open_critical = Vec::new();
     for ob in &obs {
         if !ob.critical {
             continue;
         }
+        let expected_proof_hash = evidence::proof_hash(&ob.proof_cmd);
         let discharged = evidence_index
             .get(&ob.id)
-            .map(|recs| evidence::is_discharged(recs))
+            .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, &current_ws_hash))
             .unwrap_or(false);
         if !discharged {
             open_critical.push(ob);

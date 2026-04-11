@@ -3,7 +3,9 @@ use serde::Serialize;
 use std::process::Command;
 
 use crate::error::AppError;
-use crate::ledger::{evidence, evidence::Evidence, is_initialized, obligations, state_dir};
+use crate::ledger::{
+    evidence, evidence::Evidence, is_initialized, obligations, state_dir, workspace_hash,
+};
 use crate::output::{self, Ctx};
 
 const TAIL_LIMIT: usize = 2000;
@@ -12,7 +14,13 @@ fn tail(s: &str) -> String {
     if s.len() <= TAIL_LIMIT {
         s.to_string()
     } else {
-        let start = s.len() - TAIL_LIMIT;
+        // Find a valid UTF-8 char boundary near the desired start position.
+        let desired_start = s.len() - TAIL_LIMIT;
+        let start = s
+            .char_indices()
+            .map(|(i, _)| i)
+            .find(|&i| i >= desired_start)
+            .unwrap_or(desired_start);
         format!("…{}", &s[start..])
     }
 }
@@ -44,21 +52,27 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
     let stdout = String::from_utf8_lossy(&output_res.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output_res.stderr).to_string();
 
+    let proof_hash = evidence::proof_hash(&ob.proof_cmd);
+    let ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
+
     let ev = Evidence {
         obligation_id: id.clone(),
         command: command.clone(),
         exit_code,
         stdout_tail: tail(&stdout),
         stderr_tail: tail(&stderr),
+        proof_hash,
+        workspace_hash: ws_hash,
         recorded_at: Utc::now(),
     };
     evidence::append(&dir, &ev)?;
 
+    let discharged = exit_code == 0;
     let result = ProveResult {
         obligation_id: id,
         command,
         exit_code,
-        discharged: exit_code == 0,
+        discharged,
         stdout_tail: ev.stdout_tail.clone(),
         stderr_tail: ev.stderr_tail.clone(),
     };
@@ -81,6 +95,13 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
             println!("  stderr: {}", r.stderr_tail.dimmed());
         }
     });
+
+    if !discharged {
+        return Err(AppError::VerificationFailed(format!(
+            "proof command exited {} for {}",
+            exit_code, result.obligation_id
+        )));
+    }
 
     Ok(())
 }
