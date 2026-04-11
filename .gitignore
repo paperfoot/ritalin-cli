@@ -1,0 +1,21 @@
+# Build artifacts
+/target
+**/*.rs.bk
+*.pdb
+# Cargo.lock IS committed for binary crates — deterministic builds
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# ritalin's own state in dev
+/.ritalin/
+/.task-incomplete
+
+# Local test scratchpad
+/tmp/

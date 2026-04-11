@@ -1,0 +1,125 @@
+use clap::{Parser, Subcommand, ValueEnum};
+
+#[derive(Parser)]
+#[command(
+    name = "ritalin",
+    version,
+    about = "Proof-carrying completion for AI coding agents",
+    long_about = "ritalin enforces verifiable completion contracts for AI coding agents.\n\
+                  It is the verification layer for the prompt-request era: turn vague intent into\n\
+                  tracked obligations, then block stop until every critical obligation has evidence.\n\n\
+                  Workflow:\n  \
+                  1. ritalin init --outcome \"...\"\n  \
+                  2. ritalin add \"claim\" --proof \"shell command\"  (repeat per obligation)\n  \
+                  3. Hook ritalin gate --hook-mode into Claude Code's Stop event\n  \
+                  4. Agent works, runs ritalin prove <id> --cmd \"...\" as it discharges obligations\n  \
+                  5. Stop is blocked until every critical obligation has green evidence"
+)]
+pub struct Cli {
+    /// Force JSON output even in a terminal
+    #[arg(long, global = true)]
+    pub json: bool,
+
+    /// Suppress informational human output (errors still print)
+    #[arg(long, global = true)]
+    pub quiet: bool,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[clap(rename_all = "snake_case")]
+pub enum ObligationKind {
+    UserPath,
+    Integration,
+    Persistence,
+    FailurePath,
+    Performance,
+    Security,
+    Other,
+}
+
+impl std::fmt::Display for ObligationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UserPath => write!(f, "user_path"),
+            Self::Integration => write!(f, "integration"),
+            Self::Persistence => write!(f, "persistence"),
+            Self::FailurePath => write!(f, "failure_path"),
+            Self::Performance => write!(f, "performance"),
+            Self::Security => write!(f, "security"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Initialize a ritalin scope contract in the current directory
+    Init {
+        /// One-line outcome statement (the user-facing thing being built)
+        #[arg(long)]
+        outcome: Option<String>,
+    },
+
+    /// Add a new obligation to the ledger
+    Add {
+        /// What must be true for this obligation to be discharged
+        claim: String,
+        /// Shell command that proves it (e.g. "pnpm test settings.contract.test.ts")
+        #[arg(long)]
+        proof: String,
+        /// Category of obligation
+        #[arg(long, value_enum, default_value = "other")]
+        kind: ObligationKind,
+        /// Mark as critical (gate blocks stop if open). Default true.
+        #[arg(long, default_value = "true")]
+        critical: bool,
+    },
+
+    /// Run a verification command and record evidence for an obligation
+    Prove {
+        /// Obligation ID (e.g. O-001)
+        id: String,
+        /// Override the proof command (optional; default uses obligation's stored proof)
+        #[arg(long)]
+        cmd: Option<String>,
+    },
+
+    /// Stop hook gate. Blocks unless every critical obligation has evidence.
+    Gate {
+        /// Emit Claude Code stop hook decision JSON instead of framework envelope
+        #[arg(long)]
+        hook_mode: bool,
+    },
+
+    /// Show current scope, obligations, and evidence
+    Status,
+
+    /// Machine-readable capability manifest
+    #[command(visible_alias = "info")]
+    AgentInfo,
+
+    /// Install skill file to AI agent platforms
+    Skill {
+        #[command(subcommand)]
+        action: SkillAction,
+    },
+
+    /// Self-update from GitHub Releases
+    Update {
+        /// Check only, don't install
+        #[arg(long)]
+        check: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SkillAction {
+    /// Write SKILL.md to ~/.claude/skills, ~/.codex/skills, ~/.gemini/skills
+    Install,
+    /// Check which platforms have the skill installed
+    Status,
+}

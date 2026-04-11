@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0e1a"/>
+      <stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7ee787"/>
+      <stop offset="0.5" stop-color="#a5f3a5"/>
+      <stop offset="1" stop-color="#7ee787"/>
+    </linearGradient>
+    <linearGradient id="passGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fb950" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#3fb950" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="failGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f85149" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#f85149" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- subtle grid -->
+  <g stroke="#161b22" stroke-width="1" opacity="0.6">
+    <path d="M0 80 H1280 M0 160 H1280 M0 240 H1280 M0 320 H1280 M0 400 H1280 M0 480 H1280 M0 560 H1280"/>
+    <path d="M80 0 V640 M160 0 V640 M240 0 V640 M320 0 V640 M400 0 V640 M480 0 V640 M560 0 V640 M640 0 V640 M720 0 V640 M800 0 V640 M880 0 V640 M960 0 V640 M1040 0 V640 M1120 0 V640 M1200 0 V640"/>
+  </g>
+
+  <!-- left: title block -->
+  <g transform="translate(80,140)">
+    <text x="0" y="0" font-size="120" font-weight="800" fill="url(#title)" filter="url(#glow)" letter-spacing="-4">ritalin</text>
+    <text x="6" y="48" font-size="22" fill="#7d8590" letter-spacing="0">proof-carrying completion for AI agents</text>
+    <text x="6" y="84" font-size="16" fill="#484f58">the verification layer for the prompt-request era</text>
+
+    <!-- command line -->
+    <g transform="translate(0,140)">
+      <rect x="0" y="0" width="540" height="44" rx="6" fill="#161b22" stroke="#30363d"/>
+      <text x="14" y="29" font-size="18" fill="#7ee787">$</text>
+      <text x="34" y="29" font-size="18" fill="#c9d1d9">ritalin gate <tspan fill="#7d8590">--hook-mode</tspan></text>
+    </g>
+
+    <!-- exit code stamp -->
+    <g transform="translate(0,210)">
+      <rect x="0" y="0" width="120" height="32" rx="4" fill="#0d2818" stroke="#3fb950"/>
+      <text x="14" y="22" font-size="14" fill="#3fb950" font-weight="700">EXIT 0</text>
+      <text x="80" y="22" font-size="12" fill="#7ee787">PASS</text>
+    </g>
+  </g>
+
+  <!-- right: terminal-style obligation list -->
+  <g transform="translate(720,90)">
+    <rect x="0" y="0" width="480" height="460" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <!-- header bar -->
+    <rect x="0" y="0" width="480" height="36" rx="12" fill="#0d1117"/>
+    <rect x="0" y="24" width="480" height="12" fill="#0d1117"/>
+    <circle cx="20" cy="18" r="6" fill="#f85149"/>
+    <circle cx="40" cy="18" r="6" fill="#d29922"/>
+    <circle cx="60" cy="18" r="6" fill="#3fb950"/>
+    <text x="240" y="22" font-size="13" fill="#7d8590" text-anchor="middle">ritalin status</text>
+
+    <!-- obligation rows -->
+    <g font-size="14" fill="#c9d1d9">
+      <!-- row 1: pass -->
+      <rect x="16" y="60" width="448" height="44" rx="6" fill="url(#passGlow)"/>
+      <text x="32" y="86" fill="#3fb950" font-size="18" font-weight="700">✓</text>
+      <text x="56" y="80" font-weight="600">O-001</text>
+      <text x="120" y="80">UI toggle renders</text>
+      <text x="56" y="96" fill="#6e7681" font-size="11">pnpm test settings.ui.test.ts</text>
+
+      <!-- row 2: pass -->
+      <rect x="16" y="116" width="448" height="44" rx="6" fill="url(#passGlow)"/>
+      <text x="32" y="142" fill="#3fb950" font-size="18" font-weight="700">✓</text>
+      <text x="56" y="136" font-weight="600">O-002</text>
+      <text x="120" y="136">Click handler wired</text>
+      <text x="56" y="152" fill="#6e7681" font-size="11">pnpm test settings.handler.test.ts</text>
+
+      <!-- row 3: pass -->
+      <rect x="16" y="172" width="448" height="44" rx="6" fill="url(#passGlow)"/>
+      <text x="32" y="198" fill="#3fb950" font-size="18" font-weight="700">✓</text>
+      <text x="56" y="192" font-weight="600">O-003</text>
+      <text x="120" y="192">POST /api/settings exists</text>
+      <text x="56" y="208" fill="#6e7681" font-size="11">pnpm test api/settings.contract.test.ts</text>
+
+      <!-- row 4: fail -->
+      <rect x="16" y="228" width="448" height="44" rx="6" fill="url(#failGlow)"/>
+      <text x="32" y="254" fill="#f85149" font-size="18" font-weight="700">✗</text>
+      <text x="56" y="248" font-weight="600">O-004</text>
+      <text x="120" y="248">DB row written</text>
+      <text x="56" y="264" fill="#6e7681" font-size="11">pnpm test integration/persistence.test.ts</text>
+
+      <!-- row 5: fail -->
+      <rect x="16" y="284" width="448" height="44" rx="6" fill="url(#failGlow)"/>
+      <text x="32" y="310" fill="#f85149" font-size="18" font-weight="700">✗</text>
+      <text x="56" y="304" font-weight="600">O-005</text>
+      <text x="120" y="304">Reload preserves state</text>
+      <text x="56" y="320" fill="#6e7681" font-size="11">pnpm test e2e/settings.reload.spec.ts</text>
+
+      <!-- row 6: fail -->
+      <rect x="16" y="340" width="448" height="44" rx="6" fill="url(#failGlow)"/>
+      <text x="32" y="366" fill="#f85149" font-size="18" font-weight="700">✗</text>
+      <text x="56" y="360" font-weight="600">O-006</text>
+      <text x="120" y="360">Validation error visible</text>
+      <text x="56" y="376" fill="#6e7681" font-size="11">pnpm test e2e/settings.error.spec.ts</text>
+    </g>
+
+    <!-- footer: gate verdict -->
+    <line x1="16" y1="404" x2="464" y2="404" stroke="#30363d"/>
+    <text x="32" y="430" font-size="13" fill="#f85149" font-weight="700">BLOCKED</text>
+    <text x="120" y="430" font-size="12" fill="#7d8590">3 of 6 critical obligations open</text>
+    <text x="32" y="446" font-size="11" fill="#6e7681">.task-incomplete present · stop hook returns decision:block</text>
+  </g>
+</svg>
