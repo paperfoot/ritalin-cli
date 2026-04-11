@@ -1,6 +1,6 @@
 [package]
 name = "ritalin"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Proof-carrying completion for AI coding agents. The verification layer for the prompt-request era."
@@ -28,7 +28,7 @@ sha2 = "0.10"
 hex = "0.4"
 comfy-table = "7"
 owo-colors = "4"
-self_update = { version = "0.42", features = ["archive-tar", "compression-flate2"] }
+self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
 directories = "6"
 
 [dev-dependencies]
