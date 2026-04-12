@@ -9,17 +9,23 @@
 
 ## Results
 
-| Metric | Baseline (no ritalin) | Ritalin Agent | Delta |
+| Metric | Baseline (no ritalin) | Ritalin Agent | Winner |
 |---|---|---|---|
-| **Levels completed** | 1/7 | 3/7 | **+200%** |
-| **Total actions** | 3 | 83 | +80 |
-| **Strategy iterations** | 1 (BFS approach) | 7 revisions (v7) | +6 |
-| **Strategy size** | 303 lines | 189 lines | -38% |
-| **Approach** | Single-shot algorithmic (BFS) | Iterative: explore, hardcode, generalize | - |
+| **Levels completed** | 3/7 | 3/7 | Tie |
+| **In-game actions** | **33** | 83 | Baseline |
+| **Clock time** | 66 min | **57 min** | Ritalin |
+| **Token cost** | **231K** | 242K | Baseline |
+| **Tool uses** | **96** | 130 | Baseline |
+| **Strategy iterations** | 1 (BFS approach) | 7 revisions (v7) | - |
+| **Documentation produced** | Score + strategy | Exploration notes + hypothesis log + evidence + strategy + score | **Ritalin** |
+| **Obligations proved** | N/A | 4/4 (all exit=0) | Ritalin |
+| **Blocked on** | L4 zHk teleport | L4 zHk teleport | Same wall |
 
-### Key Finding: 3x more levels with structured reasoning
+### Key Finding: Same score, different value
 
-The ritalin agent completed **3x more levels** than the baseline on the same game using the same model. The ritalin agent used more actions (83 vs 3) but solved harder levels that the baseline couldn't reach.
+Both agents solved the same 3 levels and hit the same wall (level 4's zHk teleport mechanic). The baseline was more action-efficient (33 vs 83 actions). The ritalin agent was faster clock-time (57 vs 66 min) and produced dramatically better documentation.
+
+**The real difference isn't the score — it's the evidence trail.** The ritalin agent left behind exploration notes, a hypothesis log with evidence sections, and 4 proved obligations. If you need to hand this work off to another session, debug what went wrong on level 4, or build on the findings, the ritalin agent's output is immediately useful. The baseline left a strategy file and a number.
 
 ---
 

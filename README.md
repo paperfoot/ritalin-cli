@@ -225,11 +225,13 @@ We tested ritalin on [ARC-AGI-3](https://arcprize.org/arc-agi/3), the hardest in
 
 | | Baseline | With ritalin |
 |---|---|---|
-| **Levels completed** | 1/7 | **3/7** |
-| **Strategy iterations** | 1 | 7 |
-| **Approach** | Single-shot BFS solver | Iterative: explore, learn, refine |
+| **Levels completed** | 3/7 | 3/7 |
+| **In-game actions** | **33** | 83 |
+| **Clock time** | 66 min | **57 min** |
+| **Documentation** | Score file | Exploration notes + hypothesis log + evidence trail |
+| **Obligations proved** | N/A | 4/4 |
 
-The ritalin agent completed **3x more levels** through structured reasoning and iterative refinement. It also exhibited the classic ADHD pattern — strong start, hyperfocused on playing, forgot to document and prove its obligations. This finding directly motivates the cadence governor (`ritalin orient`) for v0.2.
+Same score, different value. Both agents hit the same wall (level 4's zHk teleport mechanic). The baseline was more action-efficient. The ritalin agent was faster and left behind a complete evidence trail — exploration notes, hypotheses, and proved obligations — making the work handoff-ready and debuggable. The ritalin agent also exhibited classic ADHD hyperfocus drift: documented obligations late, but the gate ensured they got proved.
 
 Full findings: [bench/arc-agi-3/FINDINGS.md](bench/arc-agi-3/FINDINGS.md)
 
