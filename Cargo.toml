@@ -12,6 +12,7 @@ readme = "README.md"
 keywords = ["ai", "agent", "claude", "cli", "verification"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["199 Biotechnologies"]
+exclude = ["bench/arc-agi-3/", "environment_files/", "notebooklm-assets/", ".claude/"]
 
 [[bin]]
 name = "ritalin"
