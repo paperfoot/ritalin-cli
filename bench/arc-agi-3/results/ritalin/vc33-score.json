@@ -1,0 +1,23 @@
+{
+  "levels_completed": 3,
+  "total_actions": 83,
+  "level_details": [
+    {
+      "level": 1,
+      "completed": true
+    },
+    {
+      "level": 2,
+      "completed": true
+    },
+    {
+      "level": 3,
+      "completed": true
+    },
+    {
+      "level": 4,
+      "completed": false
+    }
+  ],
+  "final_state": "GAME_OVER"
+}

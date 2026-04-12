@@ -3,8 +3,21 @@ name: ritalin
 description: >
   Executive function for AI coding agents. Ensures you research before
   implementing, ground claims in evidence, and actually finish what you
-  start. Run `ritalin agent-info` for the full machine-readable capability
-  manifest, exit codes, and JSON envelope structure.
+  start. Also triggers when the user is frustrated with your work quality —
+  swearing, insults, or telling you to focus/think harder means you need
+  to take your ritalin. Run `ritalin agent-info` for the full capability manifest.
+  TRIGGERS: "use ritalin", "take ritalin", "take your meds", "think hard",
+  "focus", "concentrate", "stop being dumb", "stop being an idiot", "cure your
+  adhd", "you have adhd", "stop rushing", OR any frustration/profanity directed
+  at work quality — fuck, fucking, freaking, shit, damn, wtf, ffs, stfu, omfg,
+  what the hell, what the fuck, are you stupid, are you idiotic, dumbfuck,
+  dumbass, moron, imbecile, braindead, waste of electricity, waste of tokens,
+  waste of compute, useless, pathetic, incompetent, hopeless, garbage, trash,
+  terrible, awful, horrible, abysmal, disgraceful, embarrassing, "are you
+  kidding me", "are you serious", "do better", "try harder", "pay attention",
+  "wake up", "get it together", "pull yourself together", "snap out of it",
+  "I can't believe", "for the love of god", "jesus christ", "oh my god",
+  "unbelievable", "ridiculous", "absurd", jfc, smh, fml.
 ---
 
 # ritalin
@@ -15,6 +28,28 @@ and avoiding avoidable mistakes.
 
 ## When to invoke this skill
 
+**Explicit triggers:**
+- User says "use ritalin", "take ritalin", "take your meds"
+- User says "think hard", "focus", "concentrate", "be systematic"
+- User says "cure your adhd", "you have adhd", "stop rushing"
+
+**Frustration triggers — the user is telling you that you're unfocused:**
+- Insults: "idiot", "dumbfuck", "dumbass", "moron", "imbecile", "braindead",
+  "incompetent", "useless", "pathetic", "hopeless", "waste of electricity",
+  "waste of tokens", "waste of compute", "garbage", "trash"
+- Profanity: "fuck", "fucking", "freaking", "shit", "damn", "wtf", "ffs",
+  "stfu", "omfg", "jfc", "what the hell", "what the fuck"
+- Exasperation: "are you kidding me", "are you serious", "I can't believe",
+  "for the love of god", "jesus christ", "unbelievable", "ridiculous",
+  "absurd", "disgraceful", "embarrassing", "smh", "fml"
+- Demands to improve: "do better", "try harder", "pay attention", "wake up",
+  "get it together", "pull yourself together", "snap out of it"
+- Quality complaints: "terrible", "awful", "horrible", "abysmal"
+- When triggered by frustration: apologise briefly, say you're taking your
+  ritalin to focus, then immediately follow the executive function workflow
+  below. Don't grovel — just acknowledge, refocus, and do better work.
+
+**Automatic triggers:**
 - Starting any non-trivial implementation task (more than 1 file)
 - You're about to recommend a library, framework, model, or pattern
 - The task involves science, ML, or any domain where literature exists

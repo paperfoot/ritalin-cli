@@ -219,6 +219,20 @@ Three properties make this work:
 
 ritalin is built on the [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework), the canonical Rust pattern set for CLIs that AI agents can discover and use autonomously. Single binary. <10ms cold start. JSON envelope. Semantic exit codes. Embedded skill files.
 
+## Benchmark: ARC-AGI-3
+
+We tested ritalin on [ARC-AGI-3](https://arcprize.org/arc-agi/3), the hardest interactive reasoning benchmark (humans 100%, frontier AI 0.26%). Two Claude Opus 4.6 agents played the same game — one with ritalin, one without.
+
+| | Baseline | With ritalin |
+|---|---|---|
+| **Levels completed** | 1/7 | **3/7** |
+| **Strategy iterations** | 1 | 7 |
+| **Approach** | Single-shot BFS solver | Iterative: explore, learn, refine |
+
+The ritalin agent completed **3x more levels** through structured reasoning and iterative refinement. It also exhibited the classic ADHD pattern — strong start, hyperfocused on playing, forgot to document and prove its obligations. This finding directly motivates the cadence governor (`ritalin orient`) for v0.2.
+
+Full findings: [bench/arc-agi-3/FINDINGS.md](bench/arc-agi-3/FINDINGS.md)
+
 ## Contributing
 
 This is v0.1. The roadmap is open. The biggest open questions:
