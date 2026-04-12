@@ -91,7 +91,10 @@ Use the right kind so you reason clearly about what's being verified:
 - `failure_path`  — error states render and recover, not just happy path
 - `performance`   — measurable speed/resource targets
 - `security`      — auth, validation, secrets handling
-- `other`         — fallback (use for research grounding, code referencing, etc.)
+- `research_grounded` — approach is grounded in literature, papers, or documented best practices
+- `code_referenced`   — code follows real-world examples from high-quality repos, not hallucinated patterns
+- `model_current`     — library/model/tool recommendations are current, not stale training data
+- `other`         — fallback
 
 ## Proof commands that compose with the ecosystem
 
@@ -101,17 +104,17 @@ Proof commands aren't limited to test runners. Any CLI that returns exit 0/1 wor
 # Verify a library recommendation is current
 ritalin add "Library X is still maintained" \
   --proof "search --mode news 'library-x 2026' --json | jq '.results | length > 0'" \
-  --kind other
+  --kind model_current
 
 # Ground an approach in literature
 ritalin add "Approach has research backing" \
   --proof "search --mode scholar 'topic query' --json | jq '.results | length > 0'" \
-  --kind other
+  --kind research_grounded
 
 # Check for reference implementations
 ritalin add "Pattern matches community practice" \
   --proof "gh search repos 'pattern query' --sort stars --limit 5 --json name | jq 'length > 0'" \
-  --kind other
+  --kind code_referenced
 ```
 
 ## Anti-patterns

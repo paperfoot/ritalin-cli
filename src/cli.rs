@@ -4,16 +4,18 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(
     name = "ritalin",
     version,
-    about = "Proof-carrying completion for AI coding agents",
-    long_about = "ritalin enforces verifiable completion contracts for AI coding agents.\n\
-                  It is the verification layer for the prompt-request era: turn vague intent into\n\
-                  tracked obligations, then block stop until every critical obligation has evidence.\n\n\
+    about = "Executive function for AI coding agents",
+    long_about = "ritalin is executive function for AI coding agents.\n\
+                  Like Ritalin for ADHD — agents are smart, they just need help focusing their\n\
+                  intelligence on the right things and avoiding avoidable mistakes.\n\n\
+                  It ensures agents research before implementing, ground claims in evidence, reference\n\
+                  real code instead of hallucinating patterns, and actually finish what they start.\n\n\
                   Workflow:\n  \
                   1. ritalin init --outcome \"...\"\n  \
                   2. ritalin add \"claim\" --proof \"shell command\"  (repeat per obligation)\n  \
                   3. Hook ritalin gate --hook-mode into Claude Code's Stop event\n  \
-                  4. Agent works, runs ritalin prove <id> --cmd \"...\" as it discharges obligations\n  \
-                  5. Stop is blocked until every critical obligation has green evidence"
+                  4. Agent works, runs ritalin prove <id> as it discharges obligations\n  \
+                  5. Stop is blocked until every critical obligation has evidence"
 )]
 pub struct Cli {
     /// Force JSON output even in a terminal
@@ -38,6 +40,9 @@ pub enum ObligationKind {
     FailurePath,
     Performance,
     Security,
+    ResearchGrounded,
+    CodeReferenced,
+    ModelCurrent,
     Other,
 }
 
@@ -50,6 +55,9 @@ impl std::fmt::Display for ObligationKind {
             Self::FailurePath => write!(f, "failure_path"),
             Self::Performance => write!(f, "performance"),
             Self::Security => write!(f, "security"),
+            Self::ResearchGrounded => write!(f, "research_grounded"),
+            Self::CodeReferenced => write!(f, "code_referenced"),
+            Self::ModelCurrent => write!(f, "model_current"),
             Self::Other => write!(f, "other"),
         }
     }

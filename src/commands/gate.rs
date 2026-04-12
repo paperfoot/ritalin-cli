@@ -84,6 +84,47 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
             });
             Ok(())
         }
+        Verdict::Empty => {
+            let reason =
+                "No obligations defined. Add obligations with `ritalin add` before gating."
+                    .to_string();
+
+            if hook_mode {
+                let decision = StopHookDecision {
+                    decision: "block",
+                    reason: reason.clone(),
+                };
+                println!("{}", output::safe_json_string(&decision));
+                return Ok(());
+            }
+
+            let result = GateResult {
+                verdict: "fail",
+                obligations_total: 0,
+                obligations_open_critical: 0,
+                blocking_obligation: None,
+                blocking_reason: Some(reason.clone()),
+            };
+
+            match ctx.format {
+                output::Format::Json => {
+                    let envelope = serde_json::json!({
+                        "version": "1",
+                        "status": "fail",
+                        "data": result,
+                    });
+                    println!("{}", output::safe_json_string(&envelope));
+                    std::process::exit(1);
+                }
+                output::Format::Human => {
+                    if !ctx.quiet {
+                        use owo_colors::OwoColorize;
+                        println!("{} {}", "FAIL".red().bold(), reason);
+                    }
+                    Err(AppError::VerificationFailed(reason))
+                }
+            }
+        }
         Verdict::Fail => {
             let blocking = eval.open_critical[0];
             let reason = format!(

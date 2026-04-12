@@ -3,7 +3,7 @@
 /// Layout (relative to current working directory):
 ///   .ritalin/scope.yaml         — human-edited contract (outcome + metadata)
 ///   .ritalin/obligations.jsonl  — append-only obligation ledger
-///   .ritalin/evidence.jsonl     — append-only evidence ledger (proof of work)
+///   .ritalin/evidence.jsonl     — append-only verification evidence ledger
 ///   .task-incomplete            — marker file; presence = "agent must keep working"
 ///
 /// Why JSONL for ledgers? Append-only writes are atomic line-by-line on POSIX,

@@ -1,18 +1,20 @@
-//! ritalin -- proof-carrying completion for AI coding agents.
+//! ritalin -- executive function for AI coding agents.
+//!
+//! Like Ritalin for ADHD: agents are smart but unfocused. They skip research,
+//! hallucinate patterns, use stale training data, lose scope, and claim "done"
+//! at 80%. This CLI helps them focus their intelligence on the right things.
 //!
 //! Built on the agent-cli-framework patterns:
 //!   - JSON envelope on stdout, coloured table on TTY
 //!   - Semantic exit codes (0-4)
-//!   - `--quiet` to suppress informational output
 //!   - `agent-info` for machine-readable capability discovery
 //!   - `skill install` to register with Claude Code, Codex, Gemini
-//!   - `update` for self-update via GitHub Releases
 //!
-//! Plus the ritalin-specific contract enforcement layer:
-//!   - `init` creates a verifiable scope contract
-//!   - `add` records new obligations
+//! The binary stays lean. The SKILL.md teaches reasoning. The gate enforces:
+//!   - `init` creates a scope contract
+//!   - `add` records obligations (research, reference, freshness, tests, etc.)
 //!   - `prove` runs verification commands and records evidence
-//!   - `gate` is the Claude Code Stop hook — blocks on missing evidence
+//!   - `gate` is the Stop hook — blocks until every critical obligation is discharged
 
 mod cli;
 mod commands;

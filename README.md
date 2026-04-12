@@ -136,17 +136,17 @@ ritalin's proof commands can shell out to any CLI. The obligations aren't limite
 # Ground a solution in academic literature
 ritalin add "Approach grounded in research" \
   --proof "search --mode scholar 'transformer attention optimization' --json | jq '.results | length > 0'" \
-  --kind other
+  --kind research_grounded
 
 # Verify a library recommendation is current
 ritalin add "React Query is still the right choice" \
   --proof "search --mode news 'react query tanstack 2026' --json | jq '.results | length > 0'" \
-  --kind other
+  --kind model_current
 
 # Check for high-star reference implementations
 ritalin add "Pattern matches community best practice" \
   --proof "gh search repos 'notification preferences react' --sort stars --limit 5 --json name | jq 'length > 0'" \
-  --kind other
+  --kind code_referenced
 ```
 
 Any CLI that returns exit code 0/1 is a valid proof command. The ecosystem grows; ritalin composes with it automatically.
@@ -223,7 +223,7 @@ ritalin is built on the [agent-cli-framework](https://github.com/199-biotechnolo
 
 This is v0.1. The roadmap is open. The biggest open questions:
 
-- **Richer obligation kinds** — `research_grounded`, `code_referenced`, `model_current` as first-class kinds with ecosystem-aware proof templates
+- **Proof templates** — pre-built proof commands for `research_grounded`, `code_referenced`, and `model_current` obligation kinds that compose with ecosystem CLIs
 - **Diff compiler** — `ritalin compile` infers obligations from `git diff` + a `patterns.yaml` library
 - **Cadence governor** — `ritalin orient` as a periodic re-anchor checkpoint for long sessions
 - **Structured reasoning templates** — seed files that teach agents how to decompose problems (hypothesis-driven, atomic changes, eval-before-claim)

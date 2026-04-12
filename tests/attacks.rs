@@ -1,5 +1,4 @@
 use assert_cmd::Command;
-use predicates::prelude::*;
 use tempfile::TempDir;
 
 fn ritalin() -> Command {
@@ -98,8 +97,8 @@ fn stale_evidence_after_workspace_change() {
 
 // ─── Attack: delete obligations ledger ──────────────────────
 // If someone deletes obligations.jsonl, open_critical becomes empty.
-// Gate should still work correctly (vacuous pass is acceptable since
-// there are genuinely no obligations, but marker should exist).
+// Gate must FAIL — empty contracts cannot pass. An agent that deletes
+// the ledger should not be able to bypass .task-incomplete.
 
 #[test]
 fn deleted_obligations_ledger() {
@@ -112,9 +111,8 @@ fn deleted_obligations_ledger() {
     // Delete the obligations ledger
     std::fs::remove_file(dir.join(".ritalin/obligations.jsonl")).unwrap();
 
-    // Gate sees no obligations — passes (vacuous truth)
-    // The .task-incomplete marker gets removed
-    ritalin().args(["gate"]).current_dir(dir).assert().success();
+    // Gate sees no obligations — must fail (empty contract bypass blocked)
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
 }
 
 // ─── Attack: corrupt JSONL DoS ──────────────────────────────

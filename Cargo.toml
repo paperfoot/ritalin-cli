@@ -9,7 +9,7 @@ repository = "https://github.com/199-biotechnologies/ritalin"
 homepage = "https://github.com/199-biotechnologies/ritalin"
 documentation = "https://github.com/199-biotechnologies/ritalin"
 readme = "README.md"
-keywords = ["ai", "agent", "claude", "cli", "completion"]
+keywords = ["ai", "agent", "claude", "cli", "verification"]
 categories = ["command-line-utilities", "development-tools"]
 authors = ["199 Biotechnologies"]
 

@@ -8,7 +8,7 @@ pub fn run() {
         "name": env!("CARGO_PKG_NAME"),
         "version": env!("CARGO_PKG_VERSION"),
         "description": env!("CARGO_PKG_DESCRIPTION"),
-        "purpose": "Proof-carrying completion enforcement for AI coding agents. The verification layer for the prompt-request era.",
+        "purpose": "Executive function for AI coding agents. Ensures agents research before implementing, ground claims in evidence, and actually finish what they start.",
         "commands": {
             "init": {
                 "description": "Initialize a ritalin scope contract in the current directory",
@@ -19,6 +19,13 @@ pub fn run() {
                         "type": "string",
                         "required": false,
                         "description": "One-line outcome statement"
+                    },
+                    {
+                        "name": "--force",
+                        "type": "bool",
+                        "required": false,
+                        "default": false,
+                        "description": "Overwrite an existing contract"
                     }
                 ],
                 "creates": [".ritalin/scope.yaml", ".task-incomplete"]
@@ -46,8 +53,8 @@ pub fn run() {
                         "type": "string",
                         "required": false,
                         "default": "other",
-                        "values": ["user_path", "integration", "persistence", "failure_path", "performance", "security", "other"],
-                        "description": "Category of obligation"
+                        "values": ["user_path", "integration", "persistence", "failure_path", "performance", "security", "research_grounded", "code_referenced", "model_current", "other"],
+                        "description": "Category of obligation — use research_grounded/code_referenced/model_current for grounding work"
                     },
                     {
                         "name": "--critical",
@@ -96,6 +103,28 @@ pub fn run() {
                     "hook_mode": "Reads stop_hook_active from stdin JSON. On block, prints {\"decision\":\"block\",\"reason\":\"...\"} to stdout. On pass, exits 0 with empty stdout. Removes .task-incomplete on pass.",
                     "cli_mode": "Returns framework JSON envelope or human-readable report. Exits non-zero on fail."
                 }
+            },
+            "seed": {
+                "description": "Seed a contract from a TOML/YAML manifest file",
+                "args": [
+                    {
+                        "name": "manifest",
+                        "kind": "positional",
+                        "type": "string",
+                        "required": true,
+                        "description": "Path to the manifest file (TOML or YAML)"
+                    }
+                ],
+                "options": [
+                    {
+                        "name": "--force",
+                        "type": "bool",
+                        "required": false,
+                        "default": false,
+                        "description": "Overwrite an existing contract"
+                    }
+                ],
+                "creates": [".ritalin/scope.yaml", ".ritalin/obligations.jsonl", ".task-incomplete"]
             },
             "status": {
                 "description": "Show current scope, obligations, and evidence",
@@ -146,7 +175,7 @@ pub fn run() {
         },
         "exit_codes": {
             "0": "Success",
-            "1": "Transient error (IO, verification failed) — retry",
+            "1": "Verification failed or transient IO error — fix the underlying issue or retry",
             "2": "Not initialized — run `ritalin init`",
             "3": "Bad input (unknown obligation, invalid arg) — fix arguments",
             "4": "Rate limited (unused in v0.1) — wait and retry"
@@ -159,7 +188,7 @@ pub fn run() {
         "state_files": {
             ".ritalin/scope.yaml": "human-edited contract: outcome + metadata",
             ".ritalin/obligations.jsonl": "append-only obligation ledger",
-            ".ritalin/evidence.jsonl": "append-only evidence ledger (proof of work)",
+            ".ritalin/evidence.jsonl": "append-only verification evidence ledger",
             ".task-incomplete": "marker file; presence = agent must keep working"
         },
         "claude_code_hook_install": {

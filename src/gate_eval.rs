@@ -7,6 +7,7 @@ use crate::ledger::obligations::Obligation;
 pub enum Verdict {
     Pass,
     Fail,
+    Empty,
 }
 
 #[derive(Debug)]
@@ -21,6 +22,17 @@ pub fn evaluate<'a>(
     evidence_by_id: &HashMap<String, Vec<Evidence>>,
     current_workspace_hash: &str,
 ) -> GateEval<'a> {
+    // Empty contracts cannot pass — an agent that deletes obligations.jsonl
+    // or runs gate before adding obligations should not be able to bypass
+    // the .task-incomplete marker.
+    if obligations.is_empty() {
+        return GateEval {
+            verdict: Verdict::Empty,
+            obligations_total: 0,
+            open_critical: Vec::new(),
+        };
+    }
+
     let mut open_critical = Vec::new();
 
     for ob in obligations {
@@ -82,9 +94,9 @@ mod tests {
     const WS: &str = "current_workspace_hash_abc123";
 
     #[test]
-    fn no_obligations_is_pass() {
+    fn no_obligations_is_empty() {
         let result = evaluate(&[], &HashMap::new(), WS);
-        assert_eq!(result.verdict, Verdict::Pass);
+        assert_eq!(result.verdict, Verdict::Empty);
         assert!(result.open_critical.is_empty());
     }
 

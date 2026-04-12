@@ -49,19 +49,25 @@ pub fn run(ctx: Ctx, outcome: Option<String>, force: bool) -> Result<(), AppErro
         println!("  outcome: {}", r.outcome);
         println!();
         println!("Next steps:");
-        println!("  1. Add critical obligations:");
+        println!("  1. Research & ground your approach before implementing");
+        println!("  2. Add obligations (tests, research, references, freshness):");
         println!(
             "     {}",
-            "ritalin add \"User can submit form\" --proof \"pnpm test e2e/form.test.ts\" --kind user_path"
+            "ritalin add \"Feature works\" --proof \"pnpm test e2e/feature.test.ts\" --kind user_path"
                 .dimmed()
         );
-        println!("  2. Wire the stop hook in .claude/settings.json:");
+        println!(
+            "     {}",
+            "ritalin add \"Approach grounded\" --proof \"search --mode scholar 'topic' --json | jq '.results | length > 0'\" --kind research_grounded"
+                .dimmed()
+        );
+        println!("  3. Wire the stop hook in .claude/settings.json:");
         println!(
             "     {}",
             r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"ritalin gate --hook-mode"}]}]}}"#
                 .dimmed()
         );
-        println!("  3. Let the agent work. It will be blocked until evidence exists.");
+        println!("  4. Work, prove, gate. Blocked until every critical obligation has evidence.");
     });
 
     Ok(())

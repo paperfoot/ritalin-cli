@@ -48,7 +48,7 @@ These exist to keep ritalin small and load-bearing:
 
 ## Areas that need help
 
-- **Richer obligation kinds** — `research_grounded`, `code_referenced`, `model_current` as first-class kinds with proof templates that compose with ecosystem CLIs
+- **Proof templates** — pre-built proof commands for the `research_grounded`, `code_referenced`, and `model_current` obligation kinds that compose with ecosystem CLIs
 - **Diff compiler** — `ritalin compile` to infer obligations from `git diff` against a `patterns.yaml`
 - **Structured reasoning templates** — seed files for common reasoning patterns (hypothesis-driven, decomposition, grounding-first)
 - **Benchmark suite** — measure whether ritalin actually improves agent output quality on SWE-bench, GPQA, ARC-AGI 3, and real-world tasks
