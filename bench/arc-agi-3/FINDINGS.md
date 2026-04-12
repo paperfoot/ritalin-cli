@@ -57,17 +57,18 @@ The ritalin agent:
 
 This is the classic ADHD pattern: strong initiation, hyperfocus on the stimulating task, dropped follow-through on administrative obligations.
 
-**Evidence:**
-- `vc33-exploration.md` — obligation O-001 requires this file. **Never created.**
-- `vc33-log.md` — obligations O-002/O-003 require `Hypothesis:` and `Evidence:` sections. **Never created.**
-- `ritalin prove` — never ran on any obligation. **Zero evidence recorded.**
-- `.task-incomplete` — still present. **Gate would block completion claim.**
+**Evidence of the pattern:**
+- The agent initialized the contract and added obligations at the start of its session
+- It then spent ~50 minutes writing and iterating game strategies (7 versions)
+- Only AFTER solving 3 levels did it circle back to create `vc33-exploration.md` and `vc33-log.md`
+- It then ran `ritalin prove` on all 4 obligations — all passed (exit=0)
+- The obligations eventually got proved, but the documentation was written *after* the work, not *during*
 
-The contract enforcement is working as designed — `.task-incomplete` correctly prevents the agent from claiming "done" without evidence. But the agent needs a stronger mechanism to remind it to prove obligations *during* work, not just at the end.
+**What the gate enforced:** `.task-incomplete` stayed present throughout, correctly blocking the agent from claiming "done" without evidence. When the agent finally proved all obligations, the gate could pass. The contract worked — it just didn't prevent the mid-task drift.
 
 ### Implication for ritalin v0.2
 
-This finding points directly at the need for a **cadence governor** (`ritalin orient`) — a periodic checkpoint that re-anchors the agent to its obligations. The current system is gate-only (checks at stop time). Adding periodic re-orientation would catch the "hyperfocus drift" pattern earlier.
+This finding points directly at the need for a **cadence governor** (`ritalin orient`) — a periodic checkpoint that re-anchors the agent to its obligations mid-task, not just at stop time. The current system catches "I'm done without evidence" but not "I'm working without documenting." Adding periodic re-orientation would catch the hyperfocus drift pattern earlier and produce better documentation in real-time.
 
 ---
 
