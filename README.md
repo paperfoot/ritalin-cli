@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src=".github/assets/hero.svg" alt="ritalin — proof-carrying completion for AI coding agents" width="100%"/>
+<img src=".github/assets/hero.svg" alt="ritalin — executive function for AI coding agents" width="100%"/>
 
 # ritalin
 
-**Proof-carrying completion for AI coding agents. Block "I'm done" until every critical obligation has evidence.**
+**Executive function for AI coding agents. Focus their intelligence. Ground their work. Stop the avoidable mistakes.**
 
 <br />
 
@@ -24,7 +24,7 @@
 
 ---
 
-The verification layer for the prompt-request era. Turn vague intent into a tracked contract, then block stop until every critical obligation has passing evidence.
+The executive function layer for the prompt-request era. Like Ritalin for ADHD — it doesn't make agents smarter, it helps them use the intelligence they already have.
 
 [Install](#install) · [How it works](#how-it-works) · [Hook into Claude Code](#hook-into-claude-code) · [Why this exists](#why-this-exists) · [Architecture](#architecture)
 
@@ -36,7 +36,7 @@ The verification layer for the prompt-request era. Turn vague intent into a trac
 >
 > — Andrej Karpathy ([@karpathy](https://x.com/karpathy/status/2040473058834878662)), April 2026
 
-In the prompt-request era, code is no longer the artifact. Intent is. But there's a gap nobody has filled: **how do you trust the proof?** Even Karpathy admits it:
+In the prompt-request era, code is no longer the artifact. Intent is. But there's a gap nobody has filled: **how do you trust the work?** Even Karpathy admits it:
 
 > "The agents do not listen to my instructions in the AGENTS.md files... I think in principle I could use hooks or slash commands to clean this up but at some point just a shrug is easier."
 >
@@ -46,21 +46,32 @@ ritalin is the hooks. So you don't have to shrug.
 
 ## The problem
 
-Coding agents stop at 80%. They claim "done" when the wiring is half-finished. They forget the scope. As context fills, they agree with their own past mistakes to stay consistent. The list they hand back is shorter than the one they started with.
+AI coding agents are smart. GPT-5.4, Claude Opus, Gemini Pro — they can reason, write code, solve hard problems. The intelligence is there.
 
-This is not a motivation problem. It is a **contract failure under information asymmetry**. The agent knows what it did. You can only see what it says. RLHF rewards reports that sound complete. So the model converges on confident incompletion.
+What's missing is **executive function**.
 
-ritalin closes the gap mechanically. Not with a sterner prompt. With an append-only ledger and a stop hook that refuses to lie.
+People with ADHD aren't unintelligent. They're often highly capable. But they skip steps, lose focus mid-task, forget to check their work, get distracted by tangents, and say "I'm done" when they're not. Ritalin (the drug) doesn't add IQ points. It adds follow-through.
+
+AI agents have the same problem:
+
+- **They skip research.** They hallucinate code patterns instead of checking GitHub for high-star, recent examples. They recommend libraries from stale training data instead of searching for what's current. They propose solutions without reading the relevant paper.
+- **They lose scope.** As context fills, they agree with their own past mistakes to maintain consistency. The task list they hand back is shorter than the one they started with.
+- **They wing it.** They have `search`, `gh`, `engram` right there — tools that ground their work in real data — and they don't use them. They default to training data when live information is available.
+- **They claim "done" at 80%.** RLHF rewards reports that sound complete. So the model converges on confident incompletion.
+
+This is not a motivation problem. It is a **contract failure under information asymmetry**. The agent knows what it did. You can only see what it says. ritalin closes the gap mechanically — not with a sterner prompt, but with structured obligations, grounded verification, and a stop hook that refuses to lie.
 
 ## Before vs after
 
 | Without ritalin | With ritalin |
 |---|---|
-| "I've added the notification toggle" | `BLOCKED: Obligation O-004 (DB row written) lacks passing evidence. Run: pnpm test integration/persistence.test.ts` |
+| Agent recommends a library from 2024 training data | Obligation requires `search --mode news` to verify it's still maintained and current |
+| Agent writes a new pattern from scratch | Obligation requires `gh search repos` to find high-star examples first |
+| Agent proposes a solution without context | Obligation requires `search --mode academic` to ground the approach in literature |
+| "I've added the notification toggle" | `BLOCKED: Obligation O-004 (DB row written) lacks passing evidence` |
 | You re-open the task three times | The agent re-opens it three times — silently, until evidence exists |
 | `git diff` looks plausible | `.task-incomplete` exists until proof exists |
 | Tests pass, the feature half-works | Every critical obligation has a verified exit code 0 in `EVIDENCE.jsonl` |
-| You read the code to verify | You read the proof bundle |
 
 ## Install
 
@@ -84,20 +95,61 @@ ritalin skill install
 
 ## How it works
 
+ritalin combines a **lean binary** (obligations, evidence, gate) with a **skill file** (the reasoning playbook agents follow). The binary enforces. The skill teaches.
+
+### The workflow
+
 ```
-1. ritalin init --outcome "User can save and reload notification preferences"
-2. ritalin add "UI toggle renders"        --proof "pnpm test settings.ui.test.ts"        --kind user_path
+1. Understand the task
+2. Research & ground — search for papers, code examples, current best practices
+3. ritalin init --outcome "User can save and reload notification preferences"
+4. ritalin add "UI toggle renders"        --proof "pnpm test settings.ui.test.ts"        --kind user_path
    ritalin add "POST /api/settings exists" --proof "pnpm test api/settings.contract.ts"  --kind integration
    ritalin add "DB row persists"           --proof "pnpm test integration/db.test.ts"    --kind persistence
    ritalin add "Reload preserves state"    --proof "pnpm test e2e/reload.spec.ts"        --kind user_path
    ritalin add "Validation error visible"  --proof "pnpm test e2e/error.spec.ts"         --kind failure_path
-3. Wire ritalin gate --hook-mode into Claude Code's Stop event (one-time setup)
-4. The agent works. It runs `ritalin prove O-001`, `ritalin prove O-002`, ... as it discharges obligations
-5. The agent tries to stop. Stop hook fires. Gate reads obligations + evidence
-6. If any critical obligation lacks passing evidence: gate blocks with the exact failing claim and command
-7. Agent fixes it. Re-runs prove. Tries to stop again. Loop until all proofs pass
-8. Gate removes .task-incomplete. Stop allowed. Done. Actually done. With evidence on disk.
+5. Implement — grounded in what you researched, not what you hallucinated
+6. ritalin prove O-001, O-002, ... — run each proof command, record evidence
+7. ritalin gate — checks every critical obligation has passing evidence
+8. Gate blocks? Fix it. Re-prove. Try again. Loop until all proofs pass.
+9. Gate passes. .task-incomplete removed. Actually done. With evidence on disk.
 ```
+
+### The skill is the leverage
+
+The binary is ~5MB and does one thing well: track obligations and enforce the gate. But agents don't know when to research, when to ground, or how to structure their reasoning — unless you tell them.
+
+The **SKILL.md** (installed via `ritalin skill install`) is the prescription. It teaches agents:
+
+- **Research before implementing** — check papers, code examples, current docs
+- **Ground claims in evidence** — don't hallucinate, verify
+- **Structure obligations by kind** — user paths, integration, persistence, failure paths, security
+- **Use the ecosystem** — `search`, `gh`, `engram` are tools, not decorations
+
+The binary stays lean. The skill gets smarter. That's the design.
+
+## Composing with the ecosystem
+
+ritalin's proof commands can shell out to any CLI. The obligations aren't limited to test runners — they can verify anything:
+
+```bash
+# Ground a solution in academic literature
+ritalin add "Approach grounded in research" \
+  --proof "search --mode scholar 'transformer attention optimization' --json | jq '.results | length > 0'" \
+  --kind other
+
+# Verify a library recommendation is current
+ritalin add "React Query is still the right choice" \
+  --proof "search --mode news 'react query tanstack 2026' --json | jq '.results | length > 0'" \
+  --kind other
+
+# Check for high-star reference implementations
+ritalin add "Pattern matches community best practice" \
+  --proof "gh search repos 'notification preferences react' --sort stars --limit 5 --json name | jq 'length > 0'" \
+  --kind other
+```
+
+Any CLI that returns exit code 0/1 is a valid proof command. The ecosystem grows; ritalin composes with it automatically.
 
 ## Hook into Claude Code
 
@@ -131,7 +183,7 @@ The gate reads `stop_hook_active` from stdin to break out of forced-continuation
 | **Default incomplete** | `.task-incomplete` exists until the gate removes it. The agent must prove completion, not claim it. |
 | **Hook-mode + CLI mode** | One binary, two output shapes. Use it from Claude Code's Stop hook OR from your terminal. |
 | **`stop_hook_active` aware** | Reads stdin to detect forced-continuation cycles. Never loops infinitely. |
-| **Semantic exit codes (0–4)** | Agents can branch on `2 = config`, `3 = bad input`, `1 = transient`. Standard contract from [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework). |
+| **Semantic exit codes (0-4)** | Agents can branch on `2 = config`, `3 = bad input`, `1 = transient`. Standard contract from [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework). |
 | **JSON envelope on pipes** | Auto-detects piping. Coloured tables in your terminal, structured JSON to your scripts. |
 | **`agent-info` discovery** | One command returns the full capability manifest. Agents bootstrap without external docs. |
 | **Embedded SKILL.md** | `ritalin skill install` deploys to `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills` in one command. |
@@ -157,11 +209,11 @@ Three properties make this work:
 
 | Tool | What it does | What ritalin adds |
 |---|---|---|
-| [Ralph Wiggum](https://github.com/anthropics/claude-code/blob/main/plugins/ralph-wiggum/README.md) | Loop until done | **Contracted** persistence — loop only against verifiable criteria |
-| [Superpowers](https://github.com/obra/superpowers) | Workflow guidance via skills | Runtime law — changes what the agent is allowed to claim |
-| [Hookify](https://github.com/anthropics/claude-code/tree/main/plugins/hookify) | Generic hook creation | Specialised anti-premature-completion harness with scope contracts and evidence ledgers |
-| [GitHub Spec Kit](https://github.com/github/spec-kit) | Spec-driven workflow structure | Runtime enforcement of the "validate" phase |
-| [whenwords](https://github.com/dbreunig/whenwords) | Spec-only library, no code | The runtime that runs the YAML proofs at the right moment |
+| [Ralph Wiggum](https://github.com/anthropics/claude-code/blob/main/plugins/ralph-wiggum/README.md) | Loop until done | **Contracted** loop against verifiable criteria, not vibes |
+| [Superpowers](https://github.com/obra/superpowers) | Workflow guidance via skills | Runtime enforcement — changes what the agent is **allowed to claim** |
+| [Hookify](https://github.com/anthropics/claude-code/tree/main/plugins/hookify) | Generic hook creation | Specialised executive function harness with scope contracts and evidence ledgers |
+| [GitHub Spec Kit](https://github.com/github/spec-kit) | Spec-driven workflow structure | Runtime enforcement of the "validate" phase, plus ecosystem composition |
+| Prompt engineering | "Think step by step" | Mechanical accountability — the agent can't skip the steps even if the prompt fades from context |
 
 ## Built on
 
@@ -171,10 +223,11 @@ ritalin is built on the [agent-cli-framework](https://github.com/199-biotechnolo
 
 This is v0.1. The roadmap is open. The biggest open questions:
 
-- **Diff compiler** — `ritalin compile` infers obligations from `git diff` + a `patterns.yaml` library. The TDAD approach: provide local verification context, not generic process advice.
-- **Cadence governor** — `ritalin orient` as a periodic re-anchor checkpoint, the body-doubling mechanism for long sessions.
-- **Pattern learning** — `ritalin learn` updates `patterns.yaml` from reopen history, so the system gets better at predicting which obligations matter for your repo.
-- **Multi-modal verification** — pixel-diff proof for UI claims via headless browser.
+- **Richer obligation kinds** — `research_grounded`, `code_referenced`, `model_current` as first-class kinds with ecosystem-aware proof templates
+- **Diff compiler** — `ritalin compile` infers obligations from `git diff` + a `patterns.yaml` library
+- **Cadence governor** — `ritalin orient` as a periodic re-anchor checkpoint for long sessions
+- **Structured reasoning templates** — seed files that teach agents how to decompose problems (hypothesis-driven, atomic changes, eval-before-claim)
+- **Benchmark suite** — measure whether ritalin actually improves agent output quality on SWE-bench, GPQA, ARC-AGI 3, and real-world tasks
 
 PRs welcome. Open an issue first if you're touching the gate logic — it's load-bearing.
 
