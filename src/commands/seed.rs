@@ -65,6 +65,12 @@ pub fn run(ctx: Ctx, manifest_path: String, force: bool) -> Result<(), AppError>
         ));
     }
 
+    // When forcing, clear old ledgers so seeded IDs start fresh.
+    if force && dir.exists() {
+        let _ = std::fs::remove_file(dir.join("obligations.jsonl"));
+        let _ = std::fs::remove_file(dir.join("evidence.jsonl"));
+    }
+
     // Write scope
     let scope = Scope::new(manifest.outcome.clone());
     scope.write(&dir)?;

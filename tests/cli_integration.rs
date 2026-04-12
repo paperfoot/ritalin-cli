@@ -348,3 +348,191 @@ fn gate_json_pass_emits_success_envelope() {
     assert_eq!(json["status"], "success");
     assert_eq!(json["data"]["verdict"], "pass");
 }
+
+// ─── Fix: --cmd override does not discharge ────────────────
+
+#[test]
+fn cmd_override_does_not_discharge_original() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    // Obligation requires "false" (which would fail)
+    add_in(dir, "must fail proof", "false");
+
+    // Prove with --cmd override that succeeds
+    ritalin()
+        .args(["prove", "O-001", "--cmd", "true"])
+        .current_dir(dir)
+        .assert()
+        .success(); // prove itself succeeds (exit 0)
+
+    // But gate should FAIL — the override hash doesn't match the stored proof
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+    assert!(dir.join(".task-incomplete").exists());
+}
+
+// ─── Fix: --force clears old ledgers ───────────────────────
+
+#[test]
+fn init_force_clears_obligations_and_evidence() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // First contract
+    init_in(dir);
+    add_in(dir, "old obligation", "true");
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // Force re-init
+    ritalin()
+        .args(["init", "--outcome", "fresh start", "--force"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // Old obligations should be gone — gate should fail with "empty"
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+
+    // Verify the ledger files are actually gone
+    assert!(!dir.join(".ritalin/obligations.jsonl").exists());
+    assert!(!dir.join(".ritalin/evidence.jsonl").exists());
+}
+
+#[test]
+fn seed_force_clears_old_obligations() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // First contract with an obligation
+    init_in(dir);
+    add_in(dir, "old obligation", "echo old");
+
+    // Create a manifest
+    let manifest = dir.join("contract.toml");
+    std::fs::write(
+        &manifest,
+        r#"outcome = "seeded fresh"
+[[obligations]]
+claim = "new obligation"
+proof = "true"
+"#,
+    )
+    .unwrap();
+
+    // Seed with --force
+    ritalin()
+        .args(["seed", manifest.to_str().unwrap(), "--force"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // Should have exactly 1 obligation (the seeded one), not 2
+    let output = ritalin()
+        .args(["status", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["data"]["obligations_total"], 1);
+}
+
+// ─── Fix: add restores marker after gate ───────────────────
+
+#[test]
+fn add_after_gate_restores_marker() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "first", "true");
+
+    // Prove and gate — marker removed
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+    assert!(!dir.join(".task-incomplete").exists());
+
+    // Add a new critical obligation — marker should be restored
+    add_in(dir, "second", "true");
+    assert!(
+        dir.join(".task-incomplete").exists(),
+        ".task-incomplete should be restored after adding critical obligation post-gate"
+    );
+}
+
+#[test]
+fn add_advisory_after_gate_does_not_restore_marker() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "first", "true");
+
+    // Prove and gate — marker removed
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+    assert!(!dir.join(".task-incomplete").exists());
+
+    // Add a non-critical obligation — marker should stay gone
+    ritalin()
+        .args([
+            "add",
+            "advisory thing",
+            "--proof",
+            "echo ok",
+            "--critical=false",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+    assert!(
+        !dir.join(".task-incomplete").exists(),
+        ".task-incomplete should NOT be restored for advisory obligations"
+    );
+}
+
+// ─── Fix: advisory warnings in gate output ─────────────────
+
+#[test]
+fn gate_json_includes_advisory_open_count() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    // Add advisory obligation (not proved)
+    ritalin()
+        .args([
+            "add",
+            "advisory check",
+            "--proof",
+            "echo advisory",
+            "--critical=false",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // Gate passes (no critical obligations)
+    let output = ritalin()
+        .args(["gate", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(json["data"]["verdict"], "pass");
+    assert_eq!(json["data"]["obligations_open_advisory"], 1);
+}

@@ -17,6 +17,7 @@ struct GateResult {
     verdict: &'static str,
     obligations_total: usize,
     obligations_open_critical: usize,
+    obligations_open_advisory: usize,
     blocking_obligation: Option<String>,
     blocking_reason: Option<String>,
 }
@@ -54,7 +55,8 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
     let dir = state_dir(&cwd);
     let obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
-    let current_ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
+    let project_root = dir.parent().unwrap_or(&cwd);
+    let current_ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
 
     let eval = gate_eval::evaluate(&obs, &evidence_index, &current_ws_hash);
 
@@ -66,10 +68,12 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 return Ok(());
             }
 
+            let advisory_open = eval.open_advisory.len();
             let result = GateResult {
                 verdict: "pass",
                 obligations_total: eval.obligations_total,
                 obligations_open_critical: 0,
+                obligations_open_advisory: advisory_open,
                 blocking_obligation: None,
                 blocking_reason: None,
             };
@@ -80,6 +84,13 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                     "PASS".green().bold(),
                     r.obligations_total
                 );
+                if r.obligations_open_advisory > 0 {
+                    println!(
+                        "  {} {} advisory obligations lack evidence",
+                        "WARN".yellow().bold(),
+                        r.obligations_open_advisory
+                    );
+                }
                 println!("  {} removed", ".task-incomplete".dimmed());
             });
             Ok(())
@@ -102,6 +113,7 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 verdict: "fail",
                 obligations_total: 0,
                 obligations_open_critical: 0,
+                obligations_open_advisory: 0,
                 blocking_obligation: None,
                 blocking_reason: Some(reason.clone()),
             };
@@ -145,6 +157,7 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 verdict: "fail",
                 obligations_total: eval.obligations_total,
                 obligations_open_critical: eval.open_critical.len(),
+                obligations_open_advisory: eval.open_advisory.len(),
                 blocking_obligation: Some(blocking.id.clone()),
                 blocking_reason: Some(reason.clone()),
             };

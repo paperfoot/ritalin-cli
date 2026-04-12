@@ -26,6 +26,12 @@ pub fn run(ctx: Ctx, outcome: Option<String>, force: bool) -> Result<(), AppErro
         ));
     }
 
+    // When forcing, clear old ledgers so the contract starts fresh.
+    if force && dir.exists() {
+        let _ = std::fs::remove_file(dir.join("obligations.jsonl"));
+        let _ = std::fs::remove_file(dir.join("evidence.jsonl"));
+    }
+
     let scope = Scope::new(outcome.clone());
     scope.write(&dir)?;
 

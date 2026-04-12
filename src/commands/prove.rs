@@ -52,8 +52,9 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
     let stdout = String::from_utf8_lossy(&output_res.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output_res.stderr).to_string();
 
-    let proof_hash = evidence::proof_hash(&ob.proof_cmd);
-    let ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
+    let proof_hash = evidence::proof_hash(&command);
+    let project_root = dir.parent().unwrap_or(&cwd);
+    let ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
 
     let ev = Evidence {
         obligation_id: id.clone(),

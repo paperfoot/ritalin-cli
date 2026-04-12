@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::cli::ObligationKind;
 use crate::error::AppError;
-use crate::ledger::{is_initialized, obligations, obligations::Obligation, state_dir};
+use crate::ledger::{is_initialized, marker, obligations, obligations::Obligation, state_dir};
 use crate::output::{self, Ctx};
 
 #[derive(Serialize)]
@@ -49,6 +49,15 @@ pub fn run(
         created_at: Utc::now(),
     };
     obligations::append(&dir, &ob)?;
+
+    // Restore .task-incomplete if gate already removed it.
+    // Adding a critical obligation re-opens the contract.
+    if critical && !marker::exists(&dir) {
+        marker::create(
+            &dir,
+            &format!("ritalin: reopened — obligation {id} added after gate\n"),
+        )?;
+    }
 
     let result = AddResult {
         id,

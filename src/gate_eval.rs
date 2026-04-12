@@ -15,6 +15,7 @@ pub struct GateEval<'a> {
     pub verdict: Verdict,
     pub obligations_total: usize,
     pub open_critical: Vec<&'a Obligation>,
+    pub open_advisory: Vec<&'a Obligation>,
 }
 
 pub fn evaluate<'a>(
@@ -30,22 +31,25 @@ pub fn evaluate<'a>(
             verdict: Verdict::Empty,
             obligations_total: 0,
             open_critical: Vec::new(),
+            open_advisory: Vec::new(),
         };
     }
 
     let mut open_critical = Vec::new();
+    let mut open_advisory = Vec::new();
 
     for ob in obligations {
-        if !ob.critical {
-            continue;
-        }
         let expected_proof_hash = evidence::proof_hash(&ob.proof_cmd);
         let discharged = evidence_by_id
             .get(&ob.id)
             .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, current_workspace_hash))
             .unwrap_or(false);
         if !discharged {
-            open_critical.push(ob);
+            if ob.critical {
+                open_critical.push(ob);
+            } else {
+                open_advisory.push(ob);
+            }
         }
     }
 
@@ -59,6 +63,7 @@ pub fn evaluate<'a>(
         verdict,
         obligations_total: obligations.len(),
         open_critical,
+        open_advisory,
     }
 }
 

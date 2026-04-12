@@ -38,7 +38,8 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
     let obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
 
-    let current_ws_hash = workspace_hash::compute(&cwd).unwrap_or_default();
+    let project_root = dir.parent().unwrap_or(&cwd);
+    let current_ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
     let mut entries: Vec<ObligationStatus> = Vec::with_capacity(obs.len());
     let mut critical_total = 0;
     let mut open_critical = 0;
