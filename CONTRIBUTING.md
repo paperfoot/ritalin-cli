@@ -11,7 +11,7 @@ For docs, examples, and new patterns, skip this step. Just open the PR.
 ## 2. Build and test
 
 ```bash
-git clone https://github.com/199-biotechnologies/ritalin
+git clone https://github.com/paperfoot/ritalin-cli
 cd ritalin
 cargo build
 cargo test
@@ -43,7 +43,7 @@ These exist to keep ritalin small and load-bearing:
 - **The binary stays lean.** ritalin composes with the ecosystem (`search`, `gh`, `engram`, etc.) via proof commands. Don't build network capabilities, memory, or search into the binary. Shell out.
 - **The skill is the leverage.** The SKILL.md teaches agents how to reason. The binary enforces the contract. Most improvements to agent quality come from improving the skill, not adding commands.
 - **Keep `agent-info` honest.** Every command listed there must be routable. Drift is a P0 bug.
-- **Semantic exit codes only.** 0-4. No custom codes. The contract comes from [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework).
+- **Semantic exit codes only.** 0-4. No custom codes. The contract comes from [agent-cli-framework](https://github.com/paperfoot/agent-cli-framework).
 - **Two output shapes max.** JSON envelope on pipes, coloured human on TTY. Stop hook decisions are the only exception.
 
 ## Areas that need help

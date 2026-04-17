@@ -8,7 +8,7 @@
 
 <br />
 
-[![Star this repo](https://img.shields.io/github/stars/199-biotechnologies/ritalin?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow)](https://github.com/199-biotechnologies/ritalin/stargazers)
+[![Star this repo](https://img.shields.io/github/stars/paperfoot/ritalin-cli?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow)](https://github.com/paperfoot/ritalin-cli/stargazers)
 &nbsp;&nbsp;
 [![Follow @longevityboris](https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/longevityboris)
 
@@ -84,7 +84,7 @@ brew install ritalin
 cargo install ritalin
 
 # Or download the binary directly
-curl -L https://github.com/199-biotechnologies/ritalin/releases/latest/download/ritalin-aarch64-apple-darwin.tar.gz | tar -xz
+curl -L https://github.com/paperfoot/ritalin-cli/releases/latest/download/ritalin-aarch64-apple-darwin.tar.gz | tar -xz
 ```
 
 Then install the agent skill so Claude Code, Codex, and Gemini all know how to use it:
@@ -183,7 +183,7 @@ The gate reads `stop_hook_active` from stdin to break out of forced-continuation
 | **Default incomplete** | `.task-incomplete` exists until the gate removes it. The agent must prove completion, not claim it. |
 | **Hook-mode + CLI mode** | One binary, two output shapes. Use it from Claude Code's Stop hook OR from your terminal. |
 | **`stop_hook_active` aware** | Reads stdin to detect forced-continuation cycles. Never loops infinitely. |
-| **Semantic exit codes (0-4)** | Agents can branch on `2 = config`, `3 = bad input`, `1 = transient`. Standard contract from [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework). |
+| **Semantic exit codes (0-4)** | Agents can branch on `2 = config`, `3 = bad input`, `1 = transient`. Standard contract from [agent-cli-framework](https://github.com/paperfoot/agent-cli-framework). |
 | **JSON envelope on pipes** | Auto-detects piping. Coloured tables in your terminal, structured JSON to your scripts. |
 | **`agent-info` discovery** | One command returns the full capability manifest. Agents bootstrap without external docs. |
 | **Embedded SKILL.md** | `ritalin skill install` deploys to `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/skills` in one command. |
@@ -217,7 +217,7 @@ Three properties make this work:
 
 ## Built on
 
-ritalin is built on the [agent-cli-framework](https://github.com/199-biotechnologies/agent-cli-framework), the canonical Rust pattern set for CLIs that AI agents can discover and use autonomously. Single binary. <10ms cold start. JSON envelope. Semantic exit codes. Embedded skill files.
+ritalin is built on the [agent-cli-framework](https://github.com/paperfoot/agent-cli-framework), the canonical Rust pattern set for CLIs that AI agents can discover and use autonomously. Single binary. <10ms cold start. JSON envelope. Semantic exit codes. Embedded skill files.
 
 ## Benchmark: ARC-AGI-3
 
@@ -261,7 +261,7 @@ Built by [Boris Djordjevic](https://github.com/longevityboris) at [Paperfoot AI]
 
 **If this is useful to you:**
 
-[![Star this repo](https://img.shields.io/github/stars/199-biotechnologies/ritalin?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow)](https://github.com/199-biotechnologies/ritalin/stargazers)
+[![Star this repo](https://img.shields.io/github/stars/paperfoot/ritalin-cli?style=for-the-badge&logo=github&label=%E2%AD%90%20Star%20this%20repo&color=yellow)](https://github.com/paperfoot/ritalin-cli/stargazers)
 &nbsp;&nbsp;
 [![Follow @longevityboris](https://img.shields.io/badge/Follow_%40longevityboris-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/longevityboris)
 
