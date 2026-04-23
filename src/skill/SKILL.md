@@ -129,7 +129,55 @@ Use the right kind so you reason clearly about what's being verified:
 - `research_grounded` — approach is grounded in literature, papers, or documented best practices
 - `code_referenced`   — code follows real-world examples from high-quality repos, not hallucinated patterns
 - `model_current`     — library/model/tool recommendations are current, not stale training data
+- `literal_match`     — verbatim string must appear in a specific file (kills approximation drift)
 - `other`         — fallback
+
+## literal_match — the anti-approximation-drift kind
+
+When the task involves porting, recreating, or asserting exact values (CSS
+properties, hex colours, API response strings, config constants, version
+numbers, error codes), use `literal_match`. It's a first-class shortcut over
+`grep -F`: you give a literal + a file, and ritalin synthesises the proof.
+
+```bash
+# Hero overlay must be exactly this colour in this component
+ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
+  --kind literal_match \
+  --literal 'rgba(7,9,7,0.54)' \
+  --file src/components/home/SectionHero.tsx
+
+# Button has no rounded corners (matches your Figma source of truth)
+ritalin add "Book Online button is not rounded" \
+  --kind literal_match \
+  --literal '.btn-book { border-radius: 0' \
+  --file figma-preview/index.html
+
+# Config pins the right model version
+ritalin add "Pinned to gpt-5.4 in codex config" \
+  --kind literal_match \
+  --literal '"model": "gpt-5.4"' \
+  --file config/codex.json
+```
+
+**Why it matters:** the most common way agents hallucinate is *approximation
+drift* — stating "buttons are pill-shaped" from a training prior instead of
+reading the CSS, or "the colour is #0f0f0f" when the real value is
+`rgba(7,9,7,0.54)`. `literal_match` makes exact-value claims mechanically
+falsifiable at gate time.
+
+**Gotchas to know:**
+
+- `grep -F` matches anywhere in the file, including comments. Include enough
+  structural context in the literal (e.g. `.btn-book { border-radius: 0` not
+  just `border-radius: 0`) to avoid matching stripped or commented values.
+- The match is **case- and whitespace-sensitive**. `#BDC3BE` ≠ `#bdc3be`;
+  `rgba(7, 9, 7, 0.54)` ≠ `rgba(7,9,7,0.54)`. That's the point — exact match
+  is the whole contract — but pick your literal to match the canonical
+  formatting in the target file.
+- Missing file is a proof failure (grep exit 2), not an `add` error. The
+  evidence's `stderr_tail` will show `No such file or directory`.
+- Use `--kind literal_match` explicitly. Combining `--proof` with `--literal`
+  or using `--literal` with a different kind is rejected.
 
 ## Proof commands that compose with the ecosystem
 
@@ -150,6 +198,12 @@ ritalin add "Approach has research backing" \
 ritalin add "Pattern matches community practice" \
   --proof "gh search repos 'pattern query' --sort stars --limit 5 --json name | jq 'length > 0'" \
   --kind code_referenced
+
+# Verbatim-string check (literal_match shortcut — no hand-written grep needed)
+ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
+  --kind literal_match \
+  --literal 'rgba(7,9,7,0.54)' \
+  --file src/components/home/SectionHero.tsx
 ```
 
 ## Anti-patterns

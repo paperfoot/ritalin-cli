@@ -66,9 +66,11 @@ fn main() {
         Commands::Add {
             claim,
             proof,
+            literal,
+            file,
             kind,
             critical,
-        } => commands::add::run(ctx, claim, proof, kind, critical),
+        } => commands::add::run(ctx, claim, proof, literal, file, kind, critical),
         Commands::Prove { id, cmd } => commands::prove::run(ctx, id, cmd),
         Commands::Gate { hook_mode } => commands::gate::run(ctx, hook_mode),
         Commands::Seed { manifest, force } => commands::seed::run(ctx, manifest, force),

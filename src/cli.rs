@@ -43,6 +43,7 @@ pub enum ObligationKind {
     ResearchGrounded,
     CodeReferenced,
     ModelCurrent,
+    LiteralMatch,
     Other,
 }
 
@@ -58,6 +59,7 @@ impl std::fmt::Display for ObligationKind {
             Self::ResearchGrounded => write!(f, "research_grounded"),
             Self::CodeReferenced => write!(f, "code_referenced"),
             Self::ModelCurrent => write!(f, "model_current"),
+            Self::LiteralMatch => write!(f, "literal_match"),
             Self::Other => write!(f, "other"),
         }
     }
@@ -79,9 +81,26 @@ pub enum Commands {
     Add {
         /// What must be true for this obligation to be discharged
         claim: String,
-        /// Shell command that proves it (e.g. "pnpm test settings.contract.test.ts")
-        #[arg(long)]
-        proof: String,
+        /// Shell command that proves it (e.g. "pnpm test settings.contract.test.ts").
+        /// Required unless --literal and --file are supplied for kind=literal_match.
+        #[arg(
+            long,
+            required_unless_present_all = ["literal", "file"],
+            conflicts_with_all = ["literal", "file"],
+        )]
+        proof: Option<String>,
+        /// Verbatim string that must appear in --file. Pairs with --kind literal_match.
+        /// Proof command is auto-synthesised as `grep -F -- <literal> <file>` —
+        /// note that `grep -F` matches anywhere in the file, including comments,
+        /// so include enough structural context (e.g. `.btn { border-radius: 0`)
+        /// to avoid matching stripped strings. `allow_hyphen_values` lets literals
+        /// like `-webkit-font-smoothing` be passed without `=` escaping.
+        #[arg(long, requires = "file", allow_hyphen_values = true)]
+        literal: Option<String>,
+        /// File to search for --literal. Resolved relative to the current directory
+        /// at `prove` time; absence is a proof failure (exit 2), not an `add` error.
+        #[arg(long, requires = "literal", allow_hyphen_values = true)]
+        file: Option<String>,
         /// Category of obligation
         #[arg(long, value_enum, default_value = "other")]
         kind: ObligationKind,

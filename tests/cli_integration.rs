@@ -505,6 +505,234 @@ fn add_advisory_after_gate_does_not_restore_marker() {
 
 // ─── Fix: advisory warnings in gate output ─────────────────
 
+// ─── literal_match kind ────────────────────────────────────
+
+#[test]
+fn literal_match_proves_when_literal_present() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(
+        dir.join("theme.css"),
+        ".hero { background: rgba(7,9,7,0.54); }\n",
+    )
+    .unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "Hero overlay is verbatim rgba(7,9,7,0.54)",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "rgba(7,9,7,0.54)",
+            "--file",
+            "theme.css",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+}
+
+#[test]
+fn literal_match_fails_when_literal_absent() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    // File exists but does not contain the literal.
+    std::fs::write(dir.join("theme.css"), ".hero { background: #000; }\n").unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "Hero overlay is verbatim rgba(7,9,7,0.54)",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "rgba(7,9,7,0.54)",
+            "--file",
+            "theme.css",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .failure();
+
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+}
+
+#[test]
+fn literal_match_fails_when_file_missing() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "Value present in not-yet-existing file",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "xyz",
+            "--file",
+            "does-not-exist.css",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success(); // add succeeds — ritalin does not require the file to exist yet
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .failure(); // prove fails because grep exits 2 (no such file)
+}
+
+#[test]
+fn literal_match_handles_literal_with_single_quotes() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(dir.join("snippet.js"), "const msg = 'it\\'s here';\n").unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "Literal with apostrophes is safely quoted",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "'it\\'s here'",
+            "--file",
+            "snippet.js",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+}
+
+#[test]
+fn literal_match_handles_literal_starting_with_dash() {
+    // Regression test for the `--` guard — literals starting with `-`
+    // must not be parsed as grep flags.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(
+        dir.join("theme.css"),
+        ".body { -webkit-font-smoothing: antialiased; }\n",
+    )
+    .unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "Webkit smoothing is present",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "-webkit-font-smoothing",
+            "--file",
+            "theme.css",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+}
+
+#[test]
+fn literal_match_without_kind_is_rejected() {
+    // Supplying --literal + --file with the default kind (other) should fail:
+    // user must be explicit about the kind.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "something",
+            "--literal",
+            "x",
+            "--file",
+            "y",
+            // no --kind literal_match
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn literal_match_kind_with_proof_is_rejected() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "something",
+            "--kind",
+            "literal_match",
+            "--proof",
+            "true",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn literal_without_file_is_rejected() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "something",
+            "--kind",
+            "literal_match",
+            "--literal",
+            "x",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
 #[test]
 fn gate_json_includes_advisory_open_count() {
     let tmp = TempDir::new().unwrap();

@@ -45,16 +45,33 @@ pub fn run() {
                     {
                         "name": "--proof",
                         "type": "string",
-                        "required": true,
+                        "required": "unless --literal and --file are supplied (kind=literal_match)",
+                        "conflicts_with": ["--literal", "--file"],
                         "description": "Shell command that proves the claim"
+                    },
+                    {
+                        "name": "--literal",
+                        "type": "string",
+                        "required": false,
+                        "requires": ["--file"],
+                        "conflicts_with": ["--proof"],
+                        "description": "Verbatim string that must appear in --file. Use with --kind literal_match. Proof is auto-synthesised as `grep -F -- <literal> <file>`. Note: -F matches anywhere (including comments) — include structural context in the literal."
+                    },
+                    {
+                        "name": "--file",
+                        "type": "string",
+                        "required": false,
+                        "requires": ["--literal"],
+                        "conflicts_with": ["--proof"],
+                        "description": "Path searched by --literal. Resolved at prove time; missing file is a proof failure (grep exit 2), not an add error."
                     },
                     {
                         "name": "--kind",
                         "type": "string",
                         "required": false,
                         "default": "other",
-                        "values": ["user_path", "integration", "persistence", "failure_path", "performance", "security", "research_grounded", "code_referenced", "model_current", "other"],
-                        "description": "Category of obligation — use research_grounded/code_referenced/model_current for grounding work"
+                        "values": ["user_path", "integration", "persistence", "failure_path", "performance", "security", "research_grounded", "code_referenced", "model_current", "literal_match", "other"],
+                        "description": "Category of obligation. literal_match pairs with --literal/--file for verbatim-string checks (kills approximation drift on CSS values, config constants, hex colors, API strings, etc.)."
                     },
                     {
                         "name": "--critical",
