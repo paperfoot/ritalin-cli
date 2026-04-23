@@ -102,7 +102,10 @@ pub fn run() {
                         "description": "Override the obligation's stored proof command"
                     }
                 ],
-                "appends_to": [".ritalin/evidence.jsonl"]
+                "appends_to": [".ritalin/evidence.jsonl"],
+                "output_fields": {
+                    "remaining_open": "Scope-refresh snapshot (recomputed after this evidence is appended): { ids: [...], critical: N, advisory: N }. Lists obligations still open — includes this one if its proof failed or --cmd override changed the proof hash."
+                }
             },
             "gate": {
                 "description": "Stop hook gate. Blocks unless every critical obligation has passing evidence.",
@@ -147,6 +150,18 @@ pub fn run() {
                 "description": "Show current scope, obligations, and evidence",
                 "args": [],
                 "options": []
+            },
+            "export-contract": {
+                "description": "Emit a subagent-ready briefing for Task/Agent delegation prompts. Read-only, zero-arg. Human mode prints the raw briefing for copy/paste; --json wraps it in the envelope with structured open_obligations.",
+                "args": [],
+                "options": [],
+                "output_fields": {
+                    "outcome": "Current contract outcome from scope.yaml",
+                    "obligations_total": "Total obligations in the ledger",
+                    "remaining_open": "{ ids: [...], critical: N, advisory: N }",
+                    "open_obligations": "Array of { id, claim, kind, critical, proof_cmd, last_exit_code }",
+                    "briefing": "Ready-to-paste subagent prompt text"
+                }
             },
             "agent-info": {
                 "description": "This manifest",

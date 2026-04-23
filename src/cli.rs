@@ -137,6 +137,9 @@ pub enum Commands {
     /// Show current scope, obligations, and evidence
     Status,
 
+    /// Emit a subagent-ready briefing for Task/Agent delegation prompts
+    ExportContract,
+
     /// Machine-readable capability manifest
     #[command(visible_alias = "info")]
     AgentInfo,

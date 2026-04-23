@@ -75,6 +75,7 @@ fn main() {
         Commands::Gate { hook_mode } => commands::gate::run(ctx, hook_mode),
         Commands::Seed { manifest, force } => commands::seed::run(ctx, manifest, force),
         Commands::Status => commands::status::run(ctx),
+        Commands::ExportContract => commands::export_contract::run(ctx),
         Commands::AgentInfo => {
             commands::agent_info::run();
             Ok(())

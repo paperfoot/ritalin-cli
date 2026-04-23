@@ -505,6 +505,236 @@ fn add_advisory_after_gate_does_not_restore_marker() {
 
 // ─── Fix: advisory warnings in gate output ─────────────────
 
+// ─── prove scope-refresh ───────────────────────────────────
+
+#[test]
+fn prove_scope_refresh_lists_remaining_ids() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "first", "true");
+    add_in(dir, "second", "true");
+
+    // Prove the first; the second should appear in the refresh.
+    let out = ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let remaining = &json["data"]["remaining_open"];
+    assert_eq!(remaining["ids"][0], "O-002");
+    assert_eq!(remaining["critical"], 1);
+    assert_eq!(remaining["advisory"], 0);
+}
+
+#[test]
+fn prove_json_includes_remaining_open() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "first", "true");
+    add_in(dir, "second", "true");
+
+    let out = ritalin()
+        .args(["prove", "O-001", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let remaining = &json["data"]["remaining_open"];
+    assert_eq!(remaining["critical"], 1);
+    assert_eq!(remaining["advisory"], 0);
+    assert_eq!(remaining["ids"][0], "O-002");
+}
+
+#[test]
+fn prove_scope_refresh_empty_when_all_done() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "only", "true");
+
+    let out = ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let remaining = &json["data"]["remaining_open"];
+    assert_eq!(remaining["critical"], 0);
+    assert_eq!(remaining["advisory"], 0);
+    assert!(remaining["ids"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn prove_cmd_override_keeps_obligation_in_remaining() {
+    // `--cmd` override passes, but the hash won't match the stored proof,
+    // so the obligation stays open in the scope-refresh.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "need real proof", "false");
+
+    let out = ritalin()
+        .args(["prove", "O-001", "--cmd", "true", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let remaining = &json["data"]["remaining_open"];
+    assert_eq!(remaining["critical"], 1);
+    assert_eq!(remaining["ids"][0], "O-001");
+}
+
+// ─── export-contract ───────────────────────────────────────
+
+#[test]
+fn export_contract_human_contains_role_contract_return_format_and_donts() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    ritalin()
+        .args(["init", "--outcome", "Ship notification toggle"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    add_in(dir, "UI toggle renders", "true");
+    add_in(dir, "POST /api/settings exists", "false");
+
+    let out = ritalin()
+        .args(["export-contract"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("delegated implementation subagent"));
+    assert!(stdout.contains("OUTCOME: Ship notification toggle"));
+    assert!(stdout.contains("Anti-drift rule"));
+    assert!(stdout.contains("O-001"));
+    assert!(stdout.contains("O-002"));
+    assert!(stdout.contains("Return exactly this format"));
+    assert!(stdout.contains("Do not:"));
+    assert!(stdout.contains("claim the ritalin gate passed"));
+    // Proof commands should be included in the "parent will verify with" block.
+    assert!(stdout.contains("How the parent will later verify them:"));
+}
+
+#[test]
+fn export_contract_json_has_briefing_and_structured_open() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "a critical obligation", "true");
+
+    let out = ritalin()
+        .args(["export-contract", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["version"], "1");
+    assert_eq!(json["status"], "success");
+    let data = &json["data"];
+    assert_eq!(data["outcome"], "test outcome");
+    assert_eq!(data["obligations_total"], 1);
+    assert_eq!(data["remaining_open"]["critical"], 1);
+    assert_eq!(data["open_obligations"][0]["id"], "O-001");
+    assert_eq!(
+        data["open_obligations"][0]["claim"],
+        "a critical obligation"
+    );
+    assert!(data["briefing"].is_string());
+    assert!(
+        data["briefing"]
+            .as_str()
+            .unwrap()
+            .contains("delegated implementation subagent")
+    );
+}
+
+#[test]
+fn export_contract_no_obligations_emits_none_yet() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    let out = ritalin()
+        .args(["export-contract"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("none yet"));
+    assert!(stdout.contains("no open proofs to run"));
+}
+
+#[test]
+fn export_contract_all_proved_forbids_claiming_gate_passed() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "trivial", "true");
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    let out = ritalin()
+        .args(["export-contract"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("every obligation in the ledger has passing evidence"));
+    assert!(stdout.contains("Do not claim the ritalin gate passed"));
+}
+
+#[test]
+fn export_contract_uninitialized_errors() {
+    let tmp = TempDir::new().unwrap();
+    ritalin()
+        .args(["export-contract"])
+        .current_dir(tmp.path())
+        .assert()
+        .failure();
+}
+
+// ─── Skill file contract (embedded SKILL.md) ───────────────
+//
+// Verifies directly against the embedded file via include_str!, so we don't
+// need to install into a real HOME to test its shape.
+
+#[test]
+fn embedded_skill_md_is_under_budget_and_has_directives() {
+    let skill = include_str!("../src/skill/SKILL.md");
+    let line_count = skill.lines().count();
+    assert!(
+        line_count <= 130,
+        "SKILL.md is {line_count} lines; budget is 130 (Anthropic skill-length research)"
+    );
+    assert!(
+        skill.contains("Approximation drift is a contract breach"),
+        "SKILL.md must carry the anti-drift warning in the primacy zone"
+    );
+    assert!(
+        skill.contains("BEFORE"),
+        "SKILL.md must use BEFORE/MUST imperative directives"
+    );
+    assert!(
+        !skill.contains("## Why this exists"),
+        "SKILL.md's 'Why this exists' rationale moved to README"
+    );
+}
+
 // ─── literal_match kind ────────────────────────────────────
 
 #[test]
