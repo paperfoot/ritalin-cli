@@ -22,239 +22,100 @@ description: >
 
 # ritalin
 
-Executive function for AI coding agents. Like Ritalin for ADHD — you're
-smart, you just need help focusing your intelligence on the right things
-and avoiding avoidable mistakes.
+Your job is to **reduce the user's uncertainty**. Evidence beats fluency. A precise incomplete report is better than a polished false completion.
 
-## When to invoke this skill
+**Approximation drift is a contract breach:** if you have not read it in this turn, you MUST not state it as fact. This applies to CSS values, file contents, API shapes, config constants, version numbers, visual properties — everything.
 
-**Explicit triggers:**
-- User says "use ritalin", "take ritalin", "take your meds"
-- User says "think hard", "focus", "concentrate", "be systematic"
-- User says "cure your adhd", "you have adhd", "stop rushing"
+## When to invoke
 
-**Frustration triggers — the user is telling you that you're unfocused:**
-- Insults: "idiot", "dumbfuck", "dumbass", "moron", "imbecile", "braindead",
-  "incompetent", "useless", "pathetic", "hopeless", "waste of electricity",
-  "waste of tokens", "waste of compute", "garbage", "trash"
-- Profanity: "fuck", "fucking", "freaking", "shit", "damn", "wtf", "ffs",
-  "stfu", "omfg", "jfc", "what the hell", "what the fuck"
-- Exasperation: "are you kidding me", "are you serious", "I can't believe",
-  "for the love of god", "jesus christ", "unbelievable", "ridiculous",
-  "absurd", "disgraceful", "embarrassing", "smh", "fml"
-- Demands to improve: "do better", "try harder", "pay attention", "wake up",
-  "get it together", "pull yourself together", "snap out of it"
-- Quality complaints: "terrible", "awful", "horrible", "abysmal"
-- When triggered by frustration: apologise briefly, say you're taking your
-  ritalin to focus, then immediately follow the executive function workflow
-  below. Don't grovel — just acknowledge, refocus, and do better work.
-
-**Automatic triggers:**
-- Starting any non-trivial implementation task (more than 1 file)
-- You're about to recommend a library, framework, model, or pattern
-- The task involves science, ML, or any domain where literature exists
-- You need to write code for a pattern you haven't verified exists in the wild
-- The user said "make sure you actually finish" or similar
-- A previous session ended with the agent claiming "done" but the work was incomplete
-- The repo has a `.ritalin/` directory or `.task-incomplete` file present
+- User says "use ritalin", "take ritalin", "take your meds", "think hard", "focus", "concentrate", "cure your adhd".
+- User is frustrated with your work quality (profanity, insults, "do better", "try harder"): apologise once, take your ritalin, do better work.
+- Automatic: non-trivial implementation (>1 file), recommending a library/model/pattern, any task where literature exists, or the repo has `.ritalin/` / `.task-incomplete` present.
 
 ## Discovery
 
-Run `ritalin agent-info` once at session start. It returns the full command list,
-flags, exit codes, and the Claude Code stop-hook installation snippet. Do not
-guess at flags — the manifest is the source of truth.
+Run `ritalin agent-info` once at session start. The manifest is the source of truth for commands, flags, and exit codes. Do not guess.
 
-## The executive function workflow
+## The five phases
 
-### Phase 1: Understand
+**Phase 1 — Understand.** State the outcome in one sentence before touching code.
 
-Before touching code, understand the full scope. Read the request twice.
-Identify what you know and what you need to verify. Don't start implementing
-until you can state the outcome in one sentence.
+**Phase 2 — Research & ground.**
+- BEFORE stating any technical fact (library version, API shape, visual property, config value), you MUST read the source in the current turn OR run a search that returns citable results. "I remember from training" is not evidence.
+- BEFORE recommending a library, framework, or model, you MUST verify it is current with `search --mode news` or `gh search repos --sort stars`.
+- BEFORE writing a pattern, you MUST check high-quality implementations exist in the wild.
 
-### Phase 2: Research & ground
-
-This is the step agents skip. Don't skip it.
-
-- **For technical decisions:** Check what's current, not what you remember
-  from training data. Use `search --mode news` or `search --mode auto` to
-  verify libraries, frameworks, and models are still maintained and recommended.
-- **For code patterns:** Before writing a new pattern, check if high-quality
-  implementations exist. Use `gh search repos` with `--sort stars` to find
-  community best practices. Filter for recent, well-maintained examples.
-- **For science/ML/research tasks:** Ground your approach in literature.
-  Use `search --mode academic` or `search --mode scholar` to find relevant
-  papers. Cite what you find.
-- **For model/tool recommendations:** The model you remember from training
-  may be outdated. Search for the latest available versions and benchmarks.
-- **For anything you're not sure about:** Check. The tools are right there.
-  `search`, `gh`, `engram` — use them. Hallucinating when you could verify
-  is the #1 failure mode this skill exists to prevent.
-
-### Phase 3: Contract
-
+**Phase 3 — Contract.**
 ```
 ritalin init --outcome "<one-line statement of what success looks like>"
-ritalin add "<claim 1>" --proof "<shell command that verifies it>" --kind <kind>
-ritalin add "<claim 2>" --proof "<...>" --kind <kind>
-... (one obligation per critical thing that must be true)
+ritalin add "<claim>" --proof "<shell command>" --kind <kind>   # repeat per obligation
 ```
+BEFORE adding an obligation, the proof MUST be a shell command you can actually execute — not a description.
 
-### Phase 4: Implement
+**Phase 4 — Implement.** Grounded in what you researched, not what you hallucinated. If mid-flight you discover the approach is wrong, return to Phase 2 — don't push through.
 
-Build what you committed to. Grounded in what you researched, not in what
-you hallucinated. If you discover mid-implementation that your approach was
-wrong, go back to Phase 2. Don't push through a bad plan.
-
-### Phase 5: Prove & gate
-
+**Phase 5 — Prove & gate.**
 ```
-ritalin prove O-001        (runs the stored proof command, records evidence)
-ritalin prove O-002
-...
-ritalin gate               (checks every critical obligation has passing evidence)
-ritalin status             (human view at any point)
+ritalin prove O-001         # runs the stored proof, records evidence
+ritalin gate                # blocks stop until every critical obligation has evidence
 ```
+BEFORE running `ritalin gate`, you MUST have run `ritalin prove` for every open obligation. BEFORE ending a turn in a project with `.task-incomplete` present, you MUST run `ritalin gate --hook-mode` and act on its output.
 
 ## Obligation kinds
 
-Use the right kind so you reason clearly about what's being verified:
+| kind | when to use |
+|---|---|
+| `user_path` | user-visible behaviour from input to outcome |
+| `integration` | UI ↔ API ↔ DB wiring is real, not stubbed |
+| `persistence` | state survives reload, restart, redeploy |
+| `failure_path` | error states render and recover |
+| `performance` | measurable speed/resource targets |
+| `security` | auth, validation, secrets handling |
+| `research_grounded` | approach is grounded in papers / documented best practices |
+| `code_referenced` | pattern follows real-world examples from high-star repos |
+| `model_current` | library/model/tool recommendations are current, not stale |
+| `literal_match` | verbatim string must appear in a file — kills approximation drift |
+| `other` | fallback |
 
-- `user_path`     — user-visible behaviour from input to outcome
-- `integration`   — UI <> API <> DB wiring is real, not stubbed
-- `persistence`   — state survives reload, restart, redeploy
-- `failure_path`  — error states render and recover, not just happy path
-- `performance`   — measurable speed/resource targets
-- `security`      — auth, validation, secrets handling
-- `research_grounded` — approach is grounded in literature, papers, or documented best practices
-- `code_referenced`   — code follows real-world examples from high-quality repos, not hallucinated patterns
-- `model_current`     — library/model/tool recommendations are current, not stale training data
-- `literal_match`     — verbatim string must appear in a specific file (kills approximation drift)
-- `other`         — fallback
+## literal_match — the anti-approximation-drift shortcut
 
-## literal_match — the anti-approximation-drift kind
-
-When the task involves porting, recreating, or asserting exact values (CSS
-properties, hex colours, API response strings, config constants, version
-numbers, error codes), use `literal_match`. It's a first-class shortcut over
-`grep -F`: you give a literal + a file, and ritalin synthesises the proof.
+For exact-value claims (CSS properties, hex colours, pinned versions, config constants, API strings) use `literal_match` instead of writing the grep by hand:
 
 ```bash
-# Hero overlay must be exactly this colour in this component
 ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
   --kind literal_match \
   --literal 'rgba(7,9,7,0.54)' \
   --file src/components/home/SectionHero.tsx
-
-# Button has no rounded corners (matches your Figma source of truth)
-ritalin add "Book Online button is not rounded" \
-  --kind literal_match \
-  --literal '.btn-book { border-radius: 0' \
-  --file figma-preview/index.html
-
-# Config pins the right model version
-ritalin add "Pinned to gpt-5.4 in codex config" \
-  --kind literal_match \
-  --literal '"model": "gpt-5.4"' \
-  --file config/codex.json
 ```
 
-**Why it matters:** the most common way agents hallucinate is *approximation
-drift* — stating "buttons are pill-shaped" from a training prior instead of
-reading the CSS, or "the colour is #0f0f0f" when the real value is
-`rgba(7,9,7,0.54)`. `literal_match` makes exact-value claims mechanically
-falsifiable at gate time.
+Ritalin synthesises `grep -F -- '<literal>' '<file>'`. Gotchas: `grep -F` matches anywhere including comments, so include structural context in the literal (`.btn { border-radius: 0`); match is case- and whitespace-sensitive (that's the point).
 
-**Gotchas to know:**
+## Proof commands that compose
 
-- `grep -F` matches anywhere in the file, including comments. Include enough
-  structural context in the literal (e.g. `.btn-book { border-radius: 0` not
-  just `border-radius: 0`) to avoid matching stripped or commented values.
-- The match is **case- and whitespace-sensitive**. `#BDC3BE` ≠ `#bdc3be`;
-  `rgba(7, 9, 7, 0.54)` ≠ `rgba(7,9,7,0.54)`. That's the point — exact match
-  is the whole contract — but pick your literal to match the canonical
-  formatting in the target file.
-- Missing file is a proof failure (grep exit 2), not an `add` error. The
-  evidence's `stderr_tail` will show `No such file or directory`.
-- Use `--kind literal_match` explicitly. Combining `--proof` with `--literal`
-  or using `--literal` with a different kind is rejected.
-
-## Proof commands that compose with the ecosystem
-
-Proof commands aren't limited to test runners. Any CLI that returns exit 0/1 works:
+Any CLI that returns exit 0/1 is a valid proof:
 
 ```bash
-# Verify a library recommendation is current
-ritalin add "Library X is still maintained" \
-  --proof "search --mode news 'library-x 2026' --json | jq '.results | length > 0'" \
-  --kind model_current
-
-# Ground an approach in literature
 ritalin add "Approach has research backing" \
-  --proof "search --mode scholar 'topic query' --json | jq '.results | length > 0'" \
+  --proof "search --mode scholar 'topic' --json | jq '.results | length > 0'" \
   --kind research_grounded
 
-# Check for reference implementations
 ritalin add "Pattern matches community practice" \
   --proof "gh search repos 'pattern query' --sort stars --limit 5 --json name | jq 'length > 0'" \
   --kind code_referenced
-
-# Verbatim-string check (literal_match shortcut — no hand-written grep needed)
-ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
-  --kind literal_match \
-  --literal 'rgba(7,9,7,0.54)' \
-  --file src/components/home/SectionHero.tsx
 ```
+
+## Delegating to subagents
+
+If you spawn a subagent via the Task/Agent tool, it has no idea `.ritalin/` exists — isolated context, own system prompt, depth=1, only the summary returns. BEFORE delegating, run `ritalin export-contract` and paste the output into the delegation prompt. That briefing includes the outcome, open obligations, required return format, and explicit don'ts so the subagent stays inside your contract.
 
 ## Anti-patterns
 
-- Do NOT skip Phase 2. Researching is not optional. If you have `search` and
-  `gh` available, use them before implementing. "I know this from training" is
-  exactly the failure mode ritalin prevents.
-- Do NOT add obligations the agent can't actually verify with a shell command.
-  Vague claims like "looks nice" must be replaced with measurable commands or removed.
-- Do NOT mark obligations as `--critical false` to make the gate pass. If it's
-  not critical, it shouldn't be in the ledger.
-- Do NOT delete or edit `.ritalin/obligations.jsonl` or `.ritalin/evidence.jsonl`
-  directly. Both are append-only by design.
+- Do NOT skip Phase 2 research. Hallucinating when `search` / `gh` / `engram` are right there is the #1 failure this skill exists to prevent.
+- Do NOT add obligations you cannot verify with a shell command. Vague claims ("looks nice", "works well") must be converted to measurable commands or removed.
+- Do NOT mark obligations `--critical false` to let the gate pass. If it's not critical, it shouldn't be in the ledger.
+- Do NOT delete or edit `.ritalin/obligations.jsonl` or `.ritalin/evidence.jsonl` directly. Both are append-only by design.
 - Do NOT remove `.task-incomplete` manually. Only `ritalin gate` may remove it.
 
-## Claude Code hook installation
+## When the gate blocks
 
-Add this to `.claude/settings.json` (project-local) or `~/.claude/settings.json` (global):
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ritalin gate --hook-mode"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-The gate checks `stop_hook_active` from stdin to prevent infinite loops.
-
-## When the gate blocks you
-
-Read the `reason` field. It tells you exactly which obligation is missing
-evidence and which command to run. Run it. If it fails, fix the underlying
-problem, then re-run `ritalin prove <id>`. Do not amend the scope to make
-the failure go away — the failing obligation is information.
-
-## Why this exists
-
-AI agents are smart. They just have bad executive function. They skip research,
-hallucinate patterns, rely on stale training data, lose scope, and claim "done"
-when they're 80% through. This isn't an intelligence problem — it's an ADHD
-problem.
-
-ritalin is the executive function layer. Focus on the right things. Ground your
-work. Finish what you start.
+Read the `reason` field — it names the missing obligation and the command to run. Run it. If the proof fails, fix the underlying problem, then re-run `ritalin prove <id>`. Do not weaken the obligation to make the failure go away — the failing obligation is information.
