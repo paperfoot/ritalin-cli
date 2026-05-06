@@ -71,7 +71,7 @@ This is not a motivation problem. It is a **contract failure under information a
 | "I've added the notification toggle" | `BLOCKED: Obligation O-004 (DB row written) lacks passing evidence` |
 | You re-open the task three times | The agent re-opens it three times — silently, until evidence exists |
 | `git diff` looks plausible | `.task-incomplete` exists until proof exists |
-| Tests pass, the feature half-works | Every critical obligation has a verified exit code 0 in `EVIDENCE.jsonl` |
+| Tests pass, the feature half-works | Every critical obligation has fresh evidence bound to the stored proof command and current workspace |
 
 ## Install
 
@@ -93,6 +93,11 @@ Then install the agent skill so Claude Code, Codex, and Gemini all know how to u
 ritalin skill install
 ```
 
+For Codex, `ritalin skill install` writes both the current user skill location
+(`~/.agents/skills/ritalin/SKILL.md`) and the backward-compatible
+`$CODEX_HOME/skills/ritalin/SKILL.md` location (default `~/.codex/skills`),
+with optional `agents/openai.yaml` metadata for the Codex app.
+
 ## How it works
 
 ritalin combines a **lean binary** (obligations, evidence, gate) with a **skill file** (the reasoning playbook agents follow). The binary enforces. The skill teaches.
@@ -110,7 +115,7 @@ ritalin combines a **lean binary** (obligations, evidence, gate) with a **skill 
    ritalin add "Validation error visible"  --proof "pnpm test e2e/error.spec.ts"         --kind failure_path
 5. Implement — grounded in what you researched, not what you hallucinated
 6. ritalin prove O-001, O-002, ... — run each proof command, record evidence
-7. ritalin gate — checks every critical obligation has passing evidence
+7. ritalin gate — checks every critical obligation has fresh matching evidence
 8. Gate blocks? Fix it. Re-prove. Try again. Loop until all proofs pass.
 9. Gate passes. .task-incomplete removed. Actually done. With evidence on disk.
 ```
@@ -179,8 +184,9 @@ The gate reads `stop_hook_active` from stdin to break out of forced-continuation
 | | What it does |
 |---|---|
 | **Append-only ledgers** | `obligations.jsonl` and `evidence.jsonl` are line-atomic on POSIX. Never corrupted, never silently rewritten. |
+| **Proof + workspace binding** | Evidence only discharges when the exit code is 0, the command hash matches the stored proof, and the workspace hash still matches. |
 | **Critical / advisory** | Block on critical, warn on advisory. Risk-routed enforcement. |
-| **Default incomplete** | `.task-incomplete` exists until the gate removes it. The agent must prove completion, not claim it. |
+| **Default incomplete** | `.task-incomplete` exists until the gate removes it. If the gate later fails because evidence is stale or missing, the marker is restored. |
 | **Hook-mode + CLI mode** | One binary, two output shapes. Use it from Claude Code's Stop hook OR from your terminal. |
 | **`stop_hook_active` aware** | Reads stdin to detect forced-continuation cycles. Never loops infinitely. |
 | **Semantic exit codes (0-4)** | Agents can branch on `2 = config`, `3 = bad input`, `1 = transient`. Standard contract from [agent-cli-framework](https://github.com/paperfoot/agent-cli-framework). |

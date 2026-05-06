@@ -170,7 +170,7 @@ pub fn run() {
                 "options": []
             },
             "skill install": {
-                "description": "Install SKILL.md to ~/.claude/skills, ~/.codex/skills, ~/.gemini/skills",
+                "description": "Install SKILL.md to ~/.claude/skills, ~/.agents/skills, $CODEX_HOME/skills (or ~/.codex/skills), and ~/.gemini/skills. Codex targets also receive agents/openai.yaml metadata.",
                 "args": [],
                 "options": []
             },

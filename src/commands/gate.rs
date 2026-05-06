@@ -22,6 +22,14 @@ struct GateResult {
     blocking_reason: Option<String>,
 }
 
+fn print_hook_block(reason: String) {
+    let decision = StopHookDecision {
+        decision: "block",
+        reason,
+    };
+    println!("{}", output::safe_json_string(&decision));
+}
+
 fn read_stop_hook_active() -> bool {
     if std::io::stdin().is_terminal() {
         return false;
@@ -53,10 +61,29 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
     }
 
     let dir = state_dir(&cwd);
-    let obs = obligations::read_all(&dir)?;
-    let evidence_index = evidence::index_by_obligation(&dir)?;
-    let project_root = dir.parent().unwrap_or(&cwd);
-    let current_ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
+    let loaded = (|| {
+        let obs = obligations::read_all(&dir)?;
+        let evidence_index = evidence::index_by_obligation(&dir)?;
+        let project_root = dir.parent().unwrap_or(&cwd);
+        let current_ws_hash = workspace_hash::compute(project_root)?;
+        Ok::<_, AppError>((obs, evidence_index, current_ws_hash))
+    })();
+
+    let (obs, evidence_index, current_ws_hash) = match loaded {
+        Ok(loaded) => loaded,
+        Err(err) if hook_mode => {
+            print_hook_block(format!(
+                "ritalin gate could not verify the contract: {err}. {}",
+                err.suggestion()
+            ));
+            let _ = marker::create(
+                &dir,
+                &format!("ritalin: gate blocked — could not verify contract: {err}\n"),
+            );
+            return Ok(());
+        }
+        Err(err) => return Err(err),
+    };
 
     let eval = gate_eval::evaluate(&obs, &evidence_index, &current_ws_hash);
 
@@ -101,13 +128,11 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                     .to_string();
 
             if hook_mode {
-                let decision = StopHookDecision {
-                    decision: "block",
-                    reason: reason.clone(),
-                };
-                println!("{}", output::safe_json_string(&decision));
+                let _ = marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"));
+                print_hook_block(reason.clone());
                 return Ok(());
             }
+            marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"))?;
 
             let result = GateResult {
                 verdict: "fail",
@@ -139,19 +164,26 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
         }
         Verdict::Fail => {
             let blocking = eval.open_critical[0];
+            let expected_ph = evidence::proof_hash(&blocking.proof_cmd);
+            let evidence_state = evidence::classify(
+                evidence_index.get(&blocking.id).map(Vec::as_slice),
+                &expected_ph,
+                &current_ws_hash,
+            );
             let reason = format!(
-                "Obligation {} ({}) lacks passing evidence. Run: `ritalin prove {} --cmd \"{}\"` (or fix the proof and re-run).",
-                blocking.id, blocking.claim, blocking.id, blocking.proof_cmd
+                "Obligation {} ({}) lacks passing evidence: {}. Run: `ritalin prove {}` (or fix the proof and re-run).",
+                blocking.id,
+                blocking.claim,
+                evidence_state.explanation(),
+                blocking.id
             );
 
             if hook_mode {
-                let decision = StopHookDecision {
-                    decision: "block",
-                    reason: reason.clone(),
-                };
-                println!("{}", output::safe_json_string(&decision));
+                let _ = marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"));
+                print_hook_block(reason.clone());
                 return Ok(());
             }
+            marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"))?;
 
             let result = GateResult {
                 verdict: "fail",

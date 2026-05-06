@@ -91,6 +91,88 @@ pub fn is_discharged(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceState {
+    Passed,
+    Missing,
+    Failed,
+    ProofMismatch,
+    StaleWorkspace,
+    Legacy,
+}
+
+impl EvidenceState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Missing => "missing",
+            Self::Failed => "failed",
+            Self::ProofMismatch => "proof_mismatch",
+            Self::StaleWorkspace => "stale_workspace",
+            Self::Legacy => "legacy_evidence",
+        }
+    }
+
+    pub fn explanation(self) -> &'static str {
+        match self {
+            Self::Passed => "passing evidence matches the stored proof and current workspace",
+            Self::Missing => "no evidence has been recorded",
+            Self::Failed => "the last recorded proof command did not pass",
+            Self::ProofMismatch => "passing evidence was recorded for a different proof command",
+            Self::StaleWorkspace => {
+                "passing evidence exists, but the workspace changed since it was recorded"
+            }
+            Self::Legacy => {
+                "passing evidence exists, but it lacks proof/workspace hashes and cannot discharge"
+            }
+        }
+    }
+}
+
+/// Classify why an obligation is or is not discharged. This is deliberately
+/// more specific than `is_discharged` so gate/status output can tell agents
+/// whether to re-run the same proof, fix a failing command, or stop using a
+/// `--cmd` override that cannot satisfy the stored contract.
+pub fn classify(
+    records: Option<&[Evidence]>,
+    expected_proof_hash: &str,
+    current_workspace_hash: &str,
+) -> EvidenceState {
+    let Some(records) = records else {
+        return EvidenceState::Missing;
+    };
+    if records.is_empty() {
+        return EvidenceState::Missing;
+    }
+    if is_discharged(records, expected_proof_hash, current_workspace_hash) {
+        return EvidenceState::Passed;
+    }
+
+    if records.iter().any(|r| {
+        r.exit_code == 0
+            && r.proof_hash == expected_proof_hash
+            && !r.workspace_hash.is_empty()
+            && r.workspace_hash != current_workspace_hash
+    }) {
+        return EvidenceState::StaleWorkspace;
+    }
+
+    if records.iter().any(|r| {
+        r.exit_code == 0 && !r.proof_hash.is_empty() && r.proof_hash != expected_proof_hash
+    }) {
+        return EvidenceState::ProofMismatch;
+    }
+
+    if records
+        .iter()
+        .any(|r| r.exit_code == 0 && (r.proof_hash.is_empty() || r.workspace_hash.is_empty()))
+    {
+        return EvidenceState::Legacy;
+    }
+
+    EvidenceState::Failed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

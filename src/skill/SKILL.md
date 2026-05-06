@@ -1,23 +1,14 @@
 ---
 name: ritalin
 description: >
-  Executive function for AI coding agents. Ensures you research before
-  implementing, ground claims in evidence, and actually finish what you
-  start. Also triggers when the user is frustrated with your work quality —
-  swearing, insults, or telling you to focus/think harder means you need
-  to take your ritalin. Run `ritalin agent-info` for the full capability manifest.
-  TRIGGERS: "use ritalin", "take ritalin", "take your meds", "think hard",
-  "focus", "concentrate", "stop being dumb", "stop being an idiot", "cure your
-  adhd", "you have adhd", "stop rushing", OR any frustration/profanity directed
-  at work quality — fuck, fucking, freaking, shit, damn, wtf, ffs, stfu, omfg,
-  what the hell, what the fuck, are you stupid, are you idiotic, dumbfuck,
-  dumbass, moron, imbecile, braindead, waste of electricity, waste of tokens,
-  waste of compute, useless, pathetic, incompetent, hopeless, garbage, trash,
-  terrible, awful, horrible, abysmal, disgraceful, embarrassing, "are you
-  kidding me", "are you serious", "do better", "try harder", "pay attention",
-  "wake up", "get it together", "pull yourself together", "snap out of it",
-  "I can't believe", "for the love of god", "jesus christ", "oh my god",
-  "unbelievable", "ridiculous", "absurd", jfc, smh, fml.
+  Executive function for AI coding agents. Use when the user says "use
+  ritalin", "take ritalin", "take your meds", "think hard", "focus",
+  "concentrate", or is frustrated with work quality. Guides agents to research
+  before implementing, ground claims in evidence, create verifiable obligations,
+  run `ritalin prove`, and block completion with `ritalin gate` until critical
+  obligations have fresh matching evidence.
+metadata:
+  short-description: Evidence gate for AI coding agents
 ---
 
 # ritalin

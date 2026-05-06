@@ -13,6 +13,7 @@ struct ObligationStatus {
     kind: String,
     critical: bool,
     discharged: bool,
+    evidence_status: String,
     proof_cmd: String,
     last_exit_code: Option<i32>,
 }
@@ -39,16 +40,16 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
     let evidence_index = evidence::index_by_obligation(&dir)?;
 
     let project_root = dir.parent().unwrap_or(&cwd);
-    let current_ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
+    let current_ws_hash = workspace_hash::compute(project_root)?;
     let mut entries: Vec<ObligationStatus> = Vec::with_capacity(obs.len());
     let mut critical_total = 0;
     let mut open_critical = 0;
     for ob in &obs {
         let recs = evidence_index.get(&ob.id);
         let expected_ph = evidence::proof_hash(&ob.proof_cmd);
-        let discharged = recs
-            .map(|r| evidence::is_discharged(r, &expected_ph, &current_ws_hash))
-            .unwrap_or(false);
+        let evidence_status =
+            evidence::classify(recs.map(Vec::as_slice), &expected_ph, &current_ws_hash);
+        let discharged = matches!(evidence_status, evidence::EvidenceState::Passed);
         let last_exit = recs.and_then(|r| r.last().map(|e| e.exit_code));
 
         if ob.critical {
@@ -63,6 +64,7 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
             kind: ob.kind.to_string(),
             critical: ob.critical,
             discharged,
+            evidence_status: evidence_status.as_str().to_string(),
             proof_cmd: ob.proof_cmd.clone(),
             last_exit_code: last_exit,
         });
@@ -100,7 +102,7 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
         }
 
         let mut table = comfy_table::Table::new();
-        table.set_header(vec!["id", "kind", "critical", "discharged", "claim"]);
+        table.set_header(vec!["id", "kind", "critical", "evidence", "claim"]);
         for o in &r.obligations {
             table.add_row(vec![
                 o.id.clone(),
@@ -111,9 +113,9 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
                     "no".dimmed().to_string()
                 },
                 if o.discharged {
-                    "yes".green().to_string()
+                    o.evidence_status.green().to_string()
                 } else {
-                    "no".red().to_string()
+                    o.evidence_status.red().to_string()
                 },
                 o.claim.clone(),
             ]);

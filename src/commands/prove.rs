@@ -44,7 +44,9 @@ struct ProveResult {
     obligation_id: String,
     command: String,
     exit_code: i32,
+    command_passed: bool,
     discharged: bool,
+    evidence_status: String,
     stdout_tail: String,
     stderr_tail: String,
     remaining_open: RemainingOpen,
@@ -69,7 +71,7 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
 
     let proof_hash = evidence::proof_hash(&command);
     let project_root = dir.parent().unwrap_or(&cwd);
-    let ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
+    let ws_hash = workspace_hash::compute(project_root)?;
 
     let ev = Evidence {
         obligation_id: id.clone(),
@@ -89,6 +91,9 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
     let all_obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
     let eval = gate_eval::evaluate(&all_obs, &evidence_index, &ws_hash);
+    let stored_proof_hash = evidence::proof_hash(&ob.proof_cmd);
+    let records = evidence_index.get(&ob.id).map(Vec::as_slice);
+    let evidence_status = evidence::classify(records, &stored_proof_hash, &ws_hash);
     let remaining_open = RemainingOpen {
         ids: eval
             .open_critical
@@ -100,12 +105,15 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
         advisory: eval.open_advisory.len(),
     };
 
-    let discharged = exit_code == 0;
+    let command_passed = exit_code == 0;
+    let discharged = matches!(evidence_status, evidence::EvidenceState::Passed);
     let result = ProveResult {
         obligation_id: id,
         command,
         exit_code,
+        command_passed,
         discharged,
+        evidence_status: evidence_status.as_str().to_string(),
         stdout_tail: ev.stdout_tail.clone(),
         stderr_tail: ev.stderr_tail.clone(),
         remaining_open,
@@ -115,6 +123,8 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
         use owo_colors::OwoColorize;
         let badge = if r.discharged {
             "PASS".green().bold().to_string()
+        } else if r.command_passed {
+            "OPEN".yellow().bold().to_string()
         } else {
             "FAIL".red().bold().to_string()
         };
@@ -127,6 +137,9 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
         println!("  cmd: {}", r.command.dimmed());
         if !r.stderr_tail.is_empty() {
             println!("  stderr: {}", r.stderr_tail.dimmed());
+        }
+        if !r.discharged {
+            println!("  evidence: {}", r.evidence_status.dimmed());
         }
         // Scope refresh — recency-zone anchor for the remaining contract.
         let refresh = if r.remaining_open.ids.is_empty() {
@@ -145,7 +158,7 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
         println!("{}", refresh.dimmed());
     });
 
-    if !discharged {
+    if !command_passed {
         return Err(AppError::VerificationFailed(format!(
             "proof command exited {} for {}",
             exit_code, result.obligation_id

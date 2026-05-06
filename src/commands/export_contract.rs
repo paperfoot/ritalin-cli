@@ -55,7 +55,7 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
     let all_obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
     let project_root = dir.parent().unwrap_or(&cwd);
-    let ws_hash = workspace_hash::compute(project_root).unwrap_or_default();
+    let ws_hash = workspace_hash::compute(project_root)?;
     let eval = gate_eval::evaluate(&all_obs, &evidence_index, &ws_hash);
 
     // Merge open critical + open advisory, preserving the add-order of obligations.

@@ -166,9 +166,6 @@ fn hook_mode_corrupt_evidence_blocks() {
     // Corrupt evidence
     std::fs::write(dir.join(".ritalin/evidence.jsonl"), "not json\n").unwrap();
 
-    // Hook-mode should fail (non-empty stdout or exit non-zero)
-    // Current behavior: returns Ok(()) which is actually "allow stop"
-    // This documents the current behavior — it should ideally fail closed
     let output = ritalin()
         .args(["gate", "--hook-mode"])
         .write_stdin("{}")
@@ -176,9 +173,16 @@ fn hook_mode_corrupt_evidence_blocks() {
         .output()
         .unwrap();
 
-    // The process should exit (either 0 with block payload, or non-zero)
-    // Currently it exits non-zero on JSON parse error
-    assert!(!output.status.success() || !output.stdout.is_empty());
+    assert!(output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["decision"], "block");
+    assert!(
+        json["reason"]
+            .as_str()
+            .unwrap()
+            .contains("could not verify the contract")
+    );
+    assert!(dir.join(".task-incomplete").exists());
 }
 
 // ─── Attack: re-init overwrite protection ───────────────────

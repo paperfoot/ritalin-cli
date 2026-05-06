@@ -361,15 +361,46 @@ fn cmd_override_does_not_discharge_original() {
     add_in(dir, "must fail proof", "false");
 
     // Prove with --cmd override that succeeds
-    ritalin()
+    let output = ritalin()
         .args(["prove", "O-001", "--cmd", "true"])
         .current_dir(dir)
-        .assert()
-        .success(); // prove itself succeeds (exit 0)
+        .output()
+        .unwrap();
+    assert!(output.status.success()); // prove itself succeeds (exit 0)
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["data"]["command_passed"], true);
+    assert_eq!(json["data"]["discharged"], false);
+    assert_eq!(json["data"]["evidence_status"], "proof_mismatch");
 
     // But gate should FAIL — the override hash doesn't match the stored proof
     ritalin().args(["gate"]).current_dir(dir).assert().failure();
     assert!(dir.join(".task-incomplete").exists());
+}
+
+#[test]
+fn gate_failure_after_stale_evidence_restores_marker() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    std::fs::write(dir.join("ok.txt"), "works").unwrap();
+    init_in(dir);
+    add_in(dir, "ok.txt says works", "grep -q works ok.txt");
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+    assert!(!dir.join(".task-incomplete").exists());
+
+    std::fs::write(dir.join("ok.txt"), "changed").unwrap();
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+
+    assert!(
+        dir.join(".task-incomplete").exists(),
+        "gate failure should restore the external incomplete marker"
+    );
 }
 
 // ─── Fix: --force clears old ledgers ───────────────────────
@@ -733,6 +764,59 @@ fn embedded_skill_md_is_under_budget_and_has_directives() {
         !skill.contains("## Why this exists"),
         "SKILL.md's 'Why this exists' rationale moved to README"
     );
+
+    let frontmatter = skill
+        .split("---")
+        .nth(1)
+        .expect("SKILL.md frontmatter should be present");
+    let yaml: serde_yaml::Value = serde_yaml::from_str(frontmatter).unwrap();
+    assert_eq!(yaml["name"], "ritalin");
+    assert!(
+        yaml["description"].as_str().unwrap().len() <= 1024,
+        "Codex currently rejects descriptions longer than 1024 chars"
+    );
+    assert_eq!(
+        yaml["metadata"]["short-description"],
+        "Evidence gate for AI coding agents"
+    );
+}
+
+#[test]
+fn skill_install_writes_current_and_legacy_codex_targets() {
+    let tmp = TempDir::new().unwrap();
+    let home = tmp.path().join("home");
+    let codex_home = tmp.path().join("codex-home");
+
+    ritalin()
+        .args(["skill", "install", "--json"])
+        .env("HOME", &home)
+        .env("CODEX_HOME", &codex_home)
+        .assert()
+        .success();
+
+    for skill_dir in [
+        home.join(".agents/skills/ritalin"),
+        codex_home.join("skills/ritalin"),
+    ] {
+        let skill = skill_dir.join("SKILL.md");
+        let metadata = skill_dir.join("agents/openai.yaml");
+        assert!(skill.exists(), "{} should exist", skill.display());
+        assert!(metadata.exists(), "{} should exist", metadata.display());
+
+        let skill_text = std::fs::read_to_string(skill).unwrap();
+        let frontmatter = skill_text
+            .split("---")
+            .nth(1)
+            .expect("frontmatter should be present");
+        let yaml: serde_yaml::Value = serde_yaml::from_str(frontmatter).unwrap();
+        assert_eq!(yaml["name"], "ritalin");
+        assert!(yaml["description"].as_str().unwrap().len() <= 1024);
+
+        let metadata_text = std::fs::read_to_string(metadata).unwrap();
+        let metadata_yaml: serde_yaml::Value = serde_yaml::from_str(&metadata_text).unwrap();
+        assert_eq!(metadata_yaml["interface"]["display_name"], "ritalin");
+        assert_eq!(metadata_yaml["policy"]["allow_implicit_invocation"], true);
+    }
 }
 
 // ─── literal_match kind ────────────────────────────────────
