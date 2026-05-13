@@ -1466,3 +1466,70 @@ fn prove_warns_when_proof_mutates_workspace() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["data"]["workspace_mutated"], true);
 }
+
+// ─── gate --summary one-liner ───────────────────────────────────
+
+#[test]
+fn gate_summary_pass() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "ok", "true");
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    let out = ritalin()
+        .args(["gate", "--summary"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        stdout.trim(),
+        "verdict=pass critical_open=0 advisory_open=0 total=1"
+    );
+}
+
+#[test]
+fn gate_summary_fail_includes_blocking() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "missing", "true");
+    add_in(dir, "also missing", "true");
+
+    let out = ritalin()
+        .args(["gate", "--summary"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "summary fail should exit non-zero");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        stdout.trim(),
+        "verdict=fail critical_open=2 advisory_open=0 total=2 blocking=O-001"
+    );
+}
+
+#[test]
+fn gate_summary_empty_contract() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    let out = ritalin()
+        .args(["gate", "--summary"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        stdout.trim(),
+        "verdict=fail critical_open=0 advisory_open=0 total=0 blocking=empty"
+    );
+}

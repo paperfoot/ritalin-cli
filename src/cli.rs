@@ -146,8 +146,13 @@ pub enum Commands {
     /// Stop hook gate. Blocks unless every critical obligation has evidence.
     Gate {
         /// Emit Claude Code stop hook decision JSON instead of framework envelope
-        #[arg(long)]
+        #[arg(long, conflicts_with = "summary")]
         hook_mode: bool,
+        /// Emit a one-line shell-friendly summary instead of human/JSON envelope.
+        /// Format: `verdict=<pass|fail> critical_open=<n> advisory_open=<n>
+        /// total=<n>[ blocking=O-NNN]`. Stable schema; safe to grep / awk.
+        #[arg(long)]
+        summary: bool,
     },
 
     /// Seed a contract from a TOML/YAML manifest file

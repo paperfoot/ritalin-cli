@@ -47,7 +47,7 @@ fn read_stop_hook_active() -> bool {
         .unwrap_or(false)
 }
 
-pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
+pub fn run(ctx: Ctx, hook_mode: bool, summary: bool) -> Result<(), AppError> {
     if hook_mode && read_stop_hook_active() {
         return Ok(());
     }
@@ -95,6 +95,15 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 return Ok(());
             }
 
+            if summary {
+                println!(
+                    "verdict=pass critical_open=0 advisory_open={} total={}",
+                    eval.open_advisory.len(),
+                    eval.obligations_total
+                );
+                return Ok(());
+            }
+
             let advisory_open = eval.open_advisory.len();
             let result = GateResult {
                 verdict: "pass",
@@ -133,6 +142,11 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 return Ok(());
             }
             marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"))?;
+
+            if summary {
+                println!("verdict=fail critical_open=0 advisory_open=0 total=0 blocking=empty");
+                return Err(AppError::VerificationFailed(reason));
+            }
 
             let result = GateResult {
                 verdict: "fail",
@@ -188,6 +202,17 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
                 return Ok(());
             }
             marker::create(&dir, &format!("ritalin: gate blocked — {reason}\n"))?;
+
+            if summary {
+                println!(
+                    "verdict=fail critical_open={} advisory_open={} total={} blocking={}",
+                    eval.open_critical.len(),
+                    eval.open_advisory.len(),
+                    eval.obligations_total,
+                    blocking.id
+                );
+                return Err(AppError::VerificationFailed(reason));
+            }
 
             let result = GateResult {
                 verdict: "fail",
