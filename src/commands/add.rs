@@ -28,6 +28,37 @@ fn synth_literal_match(literal: &str, file: &str) -> String {
     format!("grep -F -- {} {}", sh_quote(literal), sh_quote(file))
 }
 
+/// Normalize a list of dependency paths: trim, drop empties, sort, dedupe,
+/// reject anything that escapes the repo (absolute paths or `..` segments).
+/// Returns the canonical list ready for storage on the obligation.
+fn normalize_depends_on(raw: Vec<String>) -> Result<Vec<String>, AppError> {
+    let mut out: Vec<String> = Vec::with_capacity(raw.len());
+    for p in raw {
+        let trimmed = p.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let path = std::path::Path::new(trimmed);
+        if path.is_absolute() {
+            return Err(AppError::InvalidInput(format!(
+                "depends_on path must be repo-relative, got absolute: {trimmed}"
+            )));
+        }
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(AppError::InvalidInput(format!(
+                "depends_on path must not contain `..`: {trimmed}"
+            )));
+        }
+        out.push(trimmed.to_string());
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     ctx: Ctx,
@@ -37,6 +68,7 @@ pub fn run(
     file: Option<String>,
     kind: ObligationKind,
     critical: bool,
+    depends_on: Vec<String>,
 ) -> Result<(), AppError> {
     let cwd = std::env::current_dir()?;
     if !is_initialized(&cwd) {
@@ -48,6 +80,12 @@ pub fn run(
     if claim.is_empty() {
         return Err(AppError::InvalidInput("claim cannot be empty".into()));
     }
+
+    // Validate dependency paths: trim whitespace, drop empties, dedupe,
+    // sort, reject paths that escape the repo root via `..` or absolute
+    // paths. Existence is checked at prove/gate time so the obligation can
+    // be added before the file lands.
+    let depends_on = normalize_depends_on(depends_on)?;
 
     // clap has already enforced:
     //   proof XOR (literal AND file); literal ↔ file; at least one path chosen.
@@ -92,6 +130,7 @@ pub fn run(
         critical,
         proof_cmd: proof_cmd.clone(),
         created_at: Utc::now(),
+        depends_on: depends_on.clone(),
     };
     obligations::append(&dir, &ob)?;
 

@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::path::Path;
 
+use crate::error::AppError;
 use crate::ledger::evidence::{self, Evidence};
 use crate::ledger::obligations::Obligation;
+use crate::ledger::workspace_hash;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
@@ -18,10 +21,35 @@ pub struct GateEval<'a> {
     pub open_advisory: Vec<&'a Obligation>,
 }
 
+/// Pre-compute the per-obligation scope hash for every obligation. Lazily
+/// computes the global workspace hash once and reuses it for any obligation
+/// that has an empty `depends_on` (the common case, and v0.3 backward-compat).
+/// Obligations with a non-empty `depends_on` get a hash scoped to just their
+/// declared files.
+pub fn compute_scope_hashes(
+    obs: &[Obligation],
+    project_root: &Path,
+) -> Result<HashMap<String, String>, AppError> {
+    let mut map: HashMap<String, String> = HashMap::with_capacity(obs.len());
+    let mut global: Option<String> = None;
+    for ob in obs {
+        let h = if ob.depends_on.is_empty() {
+            if global.is_none() {
+                global = Some(workspace_hash::compute(project_root)?);
+            }
+            global.clone().unwrap()
+        } else {
+            workspace_hash::compute_for(project_root, &ob.depends_on)?
+        };
+        map.insert(ob.id.clone(), h);
+    }
+    Ok(map)
+}
+
 pub fn evaluate<'a>(
     obligations: &'a [Obligation],
     evidence_by_id: &HashMap<String, Vec<Evidence>>,
-    current_workspace_hash: &str,
+    scope_hashes: &HashMap<String, String>,
 ) -> GateEval<'a> {
     // Empty contracts cannot pass — an agent that deletes obligations.jsonl
     // or runs gate before adding obligations should not be able to bypass
@@ -40,9 +68,13 @@ pub fn evaluate<'a>(
 
     for ob in obligations {
         let expected_proof_hash = evidence::proof_hash(&ob.proof_cmd);
+        let scope_hash = scope_hashes
+            .get(&ob.id)
+            .map(String::as_str)
+            .unwrap_or(""); // missing scope hash → cannot discharge
         let discharged = evidence_by_id
             .get(&ob.id)
-            .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, current_workspace_hash))
+            .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, scope_hash))
             .unwrap_or(false);
         if !discharged {
             if ob.critical {
@@ -80,6 +112,7 @@ mod tests {
             critical,
             proof_cmd: proof_cmd.into(),
             created_at: chrono::Utc::now(),
+            depends_on: Vec::new(),
         }
     }
 
@@ -98,9 +131,15 @@ mod tests {
 
     const WS: &str = "current_workspace_hash_abc123";
 
+    /// Build a scope_hashes map where every obligation uses the same hash.
+    /// The common case for test obligations that don't declare depends_on.
+    fn scopes(obs: &[Obligation], hash: &str) -> HashMap<String, String> {
+        obs.iter().map(|o| (o.id.clone(), hash.into())).collect()
+    }
+
     #[test]
     fn no_obligations_is_empty() {
-        let result = evaluate(&[], &HashMap::new(), WS);
+        let result = evaluate(&[], &HashMap::new(), &HashMap::new());
         assert_eq!(result.verdict, Verdict::Empty);
         assert!(result.open_critical.is_empty());
     }
@@ -108,7 +147,7 @@ mod tests {
     #[test]
     fn all_advisory_is_pass() {
         let obs = vec![ob("O-001", "true", false), ob("O-002", "echo", false)];
-        let result = evaluate(&obs, &HashMap::new(), WS);
+        let result = evaluate(&obs, &HashMap::new(), &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Pass);
         assert_eq!(result.obligations_total, 2);
     }
@@ -116,7 +155,7 @@ mod tests {
     #[test]
     fn critical_without_evidence_is_fail() {
         let obs = vec![ob("O-001", "true", true)];
-        let result = evaluate(&obs, &HashMap::new(), WS);
+        let result = evaluate(&obs, &HashMap::new(), &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Fail);
         assert_eq!(result.open_critical.len(), 1);
         assert_eq!(result.open_critical[0].id, "O-001");
@@ -127,7 +166,7 @@ mod tests {
         let obs = vec![ob("O-001", "true", true)];
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", WS)]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Pass);
     }
 
@@ -136,7 +175,7 @@ mod tests {
         let obs = vec![ob("O-001", "true", true)];
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", "old_hash")]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Fail);
     }
 
@@ -146,7 +185,7 @@ mod tests {
         let mut evidence_map = HashMap::new();
         // Evidence was recorded with a different proof command
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "echo bypass", WS)]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Fail);
     }
 
@@ -155,7 +194,7 @@ mod tests {
         let obs = vec![ob("O-001", "true", true)];
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 1, "true", WS)]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Fail);
     }
 
@@ -167,7 +206,7 @@ mod tests {
         ];
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", WS)]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Pass);
         assert_eq!(result.obligations_total, 2);
     }
@@ -178,7 +217,7 @@ mod tests {
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", WS)]);
         // O-002 has no evidence
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Fail);
         assert_eq!(result.open_critical.len(), 1);
         assert_eq!(result.open_critical[0].id, "O-002");
@@ -190,7 +229,7 @@ mod tests {
         let mut evidence_map = HashMap::new();
         evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", WS)]);
         evidence_map.insert("O-999".into(), vec![ev("O-999", 0, "true", WS)]);
-        let result = evaluate(&obs, &evidence_map, WS);
+        let result = evaluate(&obs, &evidence_map, &scopes(&obs, WS));
         assert_eq!(result.verdict, Verdict::Pass);
     }
 
@@ -202,14 +241,37 @@ mod tests {
 
         let mut map1 = HashMap::new();
         map1.insert("O-001".into(), vec![passing.clone()]);
-        let r1 = evaluate(&obs, &map1, WS);
+        let r1 = evaluate(&obs, &map1, &scopes(&obs, WS));
 
         let mut map2 = HashMap::new();
         map2.insert("O-001".into(), vec![passing, extra_fail]);
-        let r2 = evaluate(&obs, &map2, WS);
+        let r2 = evaluate(&obs, &map2, &scopes(&obs, WS));
 
         // Adding a failing record doesn't un-discharge
         assert_eq!(r1.verdict, Verdict::Pass);
         assert_eq!(r2.verdict, Verdict::Pass);
+    }
+
+    /// Per-obligation scope: when one obligation depends on a subset of
+    /// files, an unrelated change still discharges other obligations.
+    /// (Integration test for the parallel-work scenario lives in
+    /// tests/cli_integration.rs; this is a unit test of the evaluator path.)
+    #[test]
+    fn per_obligation_scope_isolates_invalidation() {
+        let obs = vec![ob("O-001", "true", true), ob("O-002", "true", true)];
+        let mut evidence_map = HashMap::new();
+        evidence_map.insert("O-001".into(), vec![ev("O-001", 0, "true", "scope-A")]);
+        evidence_map.insert("O-002".into(), vec![ev("O-002", 0, "true", "scope-B")]);
+
+        // O-001 stays in scope-A; O-002's scope changed (e.g., its file
+        // was edited). Only O-002 should be open.
+        let mut scope_hashes = HashMap::new();
+        scope_hashes.insert("O-001".into(), "scope-A".into());
+        scope_hashes.insert("O-002".into(), "scope-B-CHANGED".into());
+
+        let result = evaluate(&obs, &evidence_map, &scope_hashes);
+        assert_eq!(result.verdict, Verdict::Fail);
+        assert_eq!(result.open_critical.len(), 1);
+        assert_eq!(result.open_critical[0].id, "O-002");
     }
 }

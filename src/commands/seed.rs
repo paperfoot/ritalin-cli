@@ -21,6 +21,8 @@ struct ManifestObligation {
     kind: ObligationKind,
     #[serde(default = "default_critical")]
     critical: bool,
+    #[serde(default)]
+    depends_on: Vec<String>,
 }
 
 fn default_kind() -> ObligationKind {
@@ -92,6 +94,7 @@ pub fn run(ctx: Ctx, manifest_path: String, force: bool) -> Result<(), AppError>
             critical: mob.critical,
             proof_cmd: mob.proof.clone(),
             created_at: Utc::now(),
+            depends_on: mob.depends_on.clone(),
         };
         obligations::append(&dir, &ob)?;
     }

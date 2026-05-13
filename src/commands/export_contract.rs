@@ -14,7 +14,6 @@ use crate::error::AppError;
 use crate::gate_eval;
 use crate::ledger::{
     evidence, is_initialized, obligations, obligations::Obligation, scope::Scope, state_dir,
-    workspace_hash,
 };
 use crate::output::{self, Ctx};
 
@@ -55,8 +54,8 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
     let all_obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
     let project_root = dir.parent().unwrap_or(&cwd);
-    let ws_hash = workspace_hash::compute(project_root)?;
-    let eval = gate_eval::evaluate(&all_obs, &evidence_index, &ws_hash);
+    let scope_hashes = gate_eval::compute_scope_hashes(&all_obs, project_root)?;
+    let eval = gate_eval::evaluate(&all_obs, &evidence_index, &scope_hashes);
 
     // Merge open critical + open advisory, preserving the add-order of obligations.
     let open_refs: Vec<&Obligation> = eval

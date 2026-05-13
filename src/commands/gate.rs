@@ -3,7 +3,7 @@ use std::io::{IsTerminal, Read};
 
 use crate::error::AppError;
 use crate::gate_eval::{self, Verdict};
-use crate::ledger::{evidence, is_initialized, marker, obligations, state_dir, workspace_hash};
+use crate::ledger::{evidence, is_initialized, marker, obligations, state_dir};
 use crate::output::{self, Ctx};
 
 #[derive(Serialize)]
@@ -65,11 +65,11 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
         let obs = obligations::read_all(&dir)?;
         let evidence_index = evidence::index_by_obligation(&dir)?;
         let project_root = dir.parent().unwrap_or(&cwd);
-        let current_ws_hash = workspace_hash::compute(project_root)?;
-        Ok::<_, AppError>((obs, evidence_index, current_ws_hash))
+        let scope_hashes = gate_eval::compute_scope_hashes(&obs, project_root)?;
+        Ok::<_, AppError>((obs, evidence_index, scope_hashes))
     })();
 
-    let (obs, evidence_index, current_ws_hash) = match loaded {
+    let (obs, evidence_index, scope_hashes) = match loaded {
         Ok(loaded) => loaded,
         Err(err) if hook_mode => {
             print_hook_block(format!(
@@ -85,7 +85,7 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
         Err(err) => return Err(err),
     };
 
-    let eval = gate_eval::evaluate(&obs, &evidence_index, &current_ws_hash);
+    let eval = gate_eval::evaluate(&obs, &evidence_index, &scope_hashes);
 
     match eval.verdict {
         Verdict::Pass => {
@@ -165,10 +165,14 @@ pub fn run(ctx: Ctx, hook_mode: bool) -> Result<(), AppError> {
         Verdict::Fail => {
             let blocking = eval.open_critical[0];
             let expected_ph = evidence::proof_hash(&blocking.proof_cmd);
+            let blocking_scope = scope_hashes
+                .get(&blocking.id)
+                .map(String::as_str)
+                .unwrap_or("");
             let evidence_state = evidence::classify(
                 evidence_index.get(&blocking.id).map(Vec::as_slice),
                 &expected_ph,
-                &current_ws_hash,
+                blocking_scope,
             );
             let reason = format!(
                 "Obligation {} ({}) lacks passing evidence: {}. Run: `ritalin prove {}` (or fix the proof and re-run).",

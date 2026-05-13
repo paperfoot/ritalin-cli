@@ -15,6 +15,45 @@ pub fn compute(root: &Path) -> Result<String, AppError> {
     hash_files(root, &paths)
 }
 
+/// Compute a SHA-256 digest scoped to the obligation's declared dependencies.
+///
+/// When `depends_on` is empty, falls back to `compute(root)` — the global
+/// workspace hash, preserving v0.3 behavior for legacy obligations.
+///
+/// When `depends_on` is non-empty, hashes only the listed files. Each file
+/// is required to exist; a missing path is a hard error so an obligation
+/// cannot silently discharge against a deleted dependency. Paths are sorted
+/// and de-duplicated before hashing so the digest is order-independent.
+pub fn compute_for(root: &Path, depends_on: &[String]) -> Result<String, AppError> {
+    if depends_on.is_empty() {
+        return compute(root);
+    }
+
+    let mut paths: Vec<std::path::PathBuf> =
+        depends_on.iter().map(std::path::PathBuf::from).collect();
+    paths.sort();
+    paths.dedup();
+
+    for p in &paths {
+        let full = root.join(p);
+        if !full.exists() {
+            return Err(AppError::InvalidInput(format!(
+                "depends_on path missing at {}: {}. Add the file or update the obligation.",
+                root.display(),
+                p.display()
+            )));
+        }
+        if !full.is_file() {
+            return Err(AppError::InvalidInput(format!(
+                "depends_on path is not a file: {}. Directories and globs aren't supported in v0.4.",
+                p.display()
+            )));
+        }
+    }
+
+    hash_files(root, &paths)
+}
+
 fn hash_files(root: &Path, paths: &[std::path::PathBuf]) -> Result<String, AppError> {
     let mut hasher = Sha256::new();
     let mut sorted = paths.to_vec();

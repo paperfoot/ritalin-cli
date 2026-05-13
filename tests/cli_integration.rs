@@ -1078,3 +1078,222 @@ fn gate_json_includes_advisory_open_count() {
     assert_eq!(json["data"]["verdict"], "pass");
     assert_eq!(json["data"]["obligations_open_advisory"], 1);
 }
+
+// ─── Per-obligation --depends-on ────────────────────────────────
+//
+// The "every commit invalidates every obligation" complaint from
+// session 2026-05-13. With --depends-on, edits to unrelated files
+// don't churn evidence freshness for this obligation.
+
+#[test]
+fn depends_on_isolates_freshness_to_declared_files() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // Initialise a git repo so workspace_hash uses git ls-files.
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "t@t"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "t"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    std::fs::write(dir.join("foo.txt"), "foo-v1").unwrap();
+    std::fs::write(dir.join("bar.txt"), "bar-v1").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    init_in(dir);
+
+    // O-001 depends only on foo.txt
+    ritalin()
+        .args([
+            "add",
+            "foo content",
+            "--proof",
+            "test -f foo.txt",
+            "--depends-on",
+            "foo.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // O-002 depends only on bar.txt
+    ritalin()
+        .args([
+            "add",
+            "bar content",
+            "--proof",
+            "test -f bar.txt",
+            "--depends-on",
+            "bar.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin()
+        .args(["prove", "O-002"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // Both obligations discharged → gate passes
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+
+    // A parallel agent edits bar.txt only. O-001's scope (foo.txt)
+    // didn't change → its evidence stays fresh. O-002's scope changed
+    // → that one needs re-proving.
+    std::fs::write(dir.join("bar.txt"), "bar-v2").unwrap();
+
+    let status = ritalin()
+        .args(["status", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    let obs = json["data"]["obligations"].as_array().unwrap();
+    let o1 = obs.iter().find(|o| o["id"] == "O-001").unwrap();
+    let o2 = obs.iter().find(|o| o["id"] == "O-002").unwrap();
+    assert_eq!(
+        o1["evidence_status"], "passed",
+        "O-001 (foo.txt) should still be fresh"
+    );
+    assert_eq!(
+        o2["evidence_status"], "stale_workspace",
+        "O-002 (bar.txt) should be stale"
+    );
+
+    // Re-prove only O-002 — that's the parallel-work win.
+    ritalin()
+        .args(["prove", "O-002"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+}
+
+#[test]
+fn depends_on_rejects_path_with_parent_dir() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "escape attempt",
+            "--proof",
+            "true",
+            "--depends-on",
+            "../etc/passwd",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("must not contain `..`"));
+}
+
+#[test]
+fn depends_on_rejects_absolute_path() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "abs attempt",
+            "--proof",
+            "true",
+            "--depends-on",
+            "/etc/passwd",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("must be repo-relative"));
+}
+
+#[test]
+fn depends_on_missing_file_errors_at_prove_time() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    // Add an obligation declaring a file that doesn't yet exist.
+    // `add` allows it (the file may be created later).
+    ritalin()
+        .args([
+            "add",
+            "depends on nothing-yet",
+            "--proof",
+            "true",
+            "--depends-on",
+            "not-yet-here.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // prove should fail because the dep doesn't exist.
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("depends_on path missing"));
+
+    // After creating it, prove succeeds.
+    std::fs::write(dir.join("not-yet-here.txt"), "now-here").unwrap();
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+}
+
+#[test]
+fn depends_on_empty_falls_back_to_global_workspace_hash() {
+    // Backwards compat: existing v0.3 obligations (no depends_on) keep
+    // the global workspace_hash behavior. This test verifies that path.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    add_in(dir, "no deps", "true");
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    ritalin().args(["gate"]).current_dir(dir).assert().success();
+
+    // Touching an unrelated file invalidates this obligation, just like
+    // before — no behavior change for legacy/no-deps obligations.
+    std::fs::write(dir.join("new.txt"), "x").unwrap();
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+}

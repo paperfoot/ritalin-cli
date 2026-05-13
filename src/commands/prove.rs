@@ -71,7 +71,10 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
 
     let proof_hash = evidence::proof_hash(&command);
     let project_root = dir.parent().unwrap_or(&cwd);
-    let ws_hash = workspace_hash::compute(project_root)?;
+    // Use the obligation's per-file dependency scope when set; otherwise
+    // the global workspace hash. Identical for v0.3 obligations (depends_on
+    // defaults to empty).
+    let ws_hash = workspace_hash::compute_for(project_root, &ob.depends_on)?;
 
     let ev = Evidence {
         obligation_id: id.clone(),
@@ -90,7 +93,8 @@ pub fn run(ctx: Ctx, id: String, cmd: Option<String>) -> Result<(), AppError> {
     // recency-injection line the agent sees in its high-attention zone.
     let all_obs = obligations::read_all(&dir)?;
     let evidence_index = evidence::index_by_obligation(&dir)?;
-    let eval = gate_eval::evaluate(&all_obs, &evidence_index, &ws_hash);
+    let scope_hashes = gate_eval::compute_scope_hashes(&all_obs, project_root)?;
+    let eval = gate_eval::evaluate(&all_obs, &evidence_index, &scope_hashes);
     let stored_proof_hash = evidence::proof_hash(&ob.proof_cmd);
     let records = evidence_index.get(&ob.id).map(Vec::as_slice);
     let evidence_status = evidence::classify(records, &stored_proof_hash, &ws_hash);

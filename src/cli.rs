@@ -107,6 +107,16 @@ pub enum Commands {
         /// Mark as critical (gate blocks stop if open). Default true.
         #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
         critical: bool,
+        /// Comma-separated repo-relative paths the proof depends on. When set,
+        /// this obligation's evidence freshness is checked against the SHA-256
+        /// of just these files instead of the whole workspace — so unrelated
+        /// edits in a parallel session don't churn this obligation. Files
+        /// must exist at `prove`/`gate` time. When omitted, the global
+        /// workspace hash is used (v0.3 behavior).
+        ///
+        /// Example: --depends-on src/foo.rs,src/bar.rs
+        #[arg(long, value_delimiter = ',')]
+        depends_on: Vec<String>,
     },
 
     /// Run a verification command and record evidence for an obligation

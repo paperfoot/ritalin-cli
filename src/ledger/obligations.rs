@@ -20,6 +20,14 @@ pub struct Obligation {
     pub critical: bool,
     pub proof_cmd: String,
     pub created_at: DateTime<Utc>,
+    /// Files (relative to repo root) whose contents this proof depends on.
+    /// When non-empty, evidence freshness is checked against the SHA-256 of
+    /// just these files instead of the whole workspace — so unrelated edits
+    /// in a parallel session don't invalidate this obligation's evidence.
+    /// When empty (the default), the global workspace hash is used, which
+    /// preserves v0.3 behavior for existing contracts.
+    #[serde(default)]
+    pub depends_on: Vec<String>,
 }
 
 pub fn ledger_path(state_dir: &Path) -> std::path::PathBuf {
@@ -82,6 +90,7 @@ mod tests {
             critical: true,
             proof_cmd: "true".into(),
             created_at: chrono::Utc::now(),
+            depends_on: Vec::new(),
         }
     }
 
