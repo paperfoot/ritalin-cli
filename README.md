@@ -108,17 +108,19 @@ ritalin combines a **lean binary** (obligations, evidence, gate) with a **skill 
 1. Understand the task
 2. Research & ground — search for papers, code examples, current best practices
 3. ritalin init --outcome "User can save and reload notification preferences"
-4. ritalin add "UI toggle renders"        --proof "pnpm test settings.ui.test.ts"        --kind user_path
-   ritalin add "POST /api/settings exists" --proof "pnpm test api/settings.contract.ts"  --kind integration
+4. ritalin add "UI toggle renders"        --proof "pnpm test settings.ui.test.ts"        --kind user_path        --depends-on src/Settings.tsx
+   ritalin add "POST /api/settings exists" --proof "pnpm test api/settings.contract.ts"  --kind integration      --depends-on src/api/settings.ts
    ritalin add "DB row persists"           --proof "pnpm test integration/db.test.ts"    --kind persistence
    ritalin add "Reload preserves state"    --proof "pnpm test e2e/reload.spec.ts"        --kind user_path
    ritalin add "Validation error visible"  --proof "pnpm test e2e/error.spec.ts"         --kind failure_path
 5. Implement — grounded in what you researched, not what you hallucinated
-6. ritalin prove O-001, O-002, ... — run each proof command, record evidence
-7. ritalin gate — checks every critical obligation has fresh matching evidence
-8. Gate blocks? Fix it. Re-prove. Try again. Loop until all proofs pass.
+6. ritalin prove --all                    # batch-refresh, or `prove --all --stale-only` after a commit
+7. ritalin gate                           # or `ritalin gate --summary` for hooks/CI
+8. Gate blocks? Fix it. Re-prove. Try again.
 9. Gate passes. .task-incomplete removed. Actually done. With evidence on disk.
 ```
+
+`--depends-on` (v0.4) scopes per-obligation freshness to specific files, so a teammate's commit elsewhere doesn't churn unrelated obligations. Omit it and the global workspace hash is used (v0.3 default).
 
 ### The skill is the leverage
 
@@ -184,7 +186,10 @@ The gate reads `stop_hook_active` from stdin to break out of forced-continuation
 | | What it does |
 |---|---|
 | **Append-only ledgers** | `obligations.jsonl` and `evidence.jsonl` are line-atomic on POSIX. Never corrupted, never silently rewritten. |
-| **Proof + workspace binding** | Evidence only discharges when the exit code is 0, the command hash matches the stored proof, and the workspace hash still matches. |
+| **Forgery-resistant evidence** | Gate recomputes `proof_hash` from the recorded `command` field — forging the stored hash to claim a proof you didn't run is rejected. (v0.4) |
+| **Per-obligation file scope** | `--depends-on a.rs,b.rs` (v0.4) limits freshness checks to declared files, so unrelated parallel edits don't invalidate evidence. |
+| **Batch prove + summary gate** | `ritalin prove --all [--stale-only]` and `ritalin gate --summary` (v0.4) for hooks/CI. |
+| **Proof + workspace binding** | Evidence only discharges when the exit code is 0, the recorded command hashes to the obligation's stored proof, and the workspace hash still matches. |
 | **Critical / advisory** | Block on critical, warn on advisory. Risk-routed enforcement. |
 | **Default incomplete** | `.task-incomplete` exists until the gate removes it. If the gate later fails because evidence is stale or missing, the marker is restored. |
 | **Hook-mode + CLI mode** | One binary, two output shapes. Use it from Claude Code's Stop hook OR from your terminal. |
