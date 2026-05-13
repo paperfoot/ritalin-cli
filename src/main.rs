@@ -72,7 +72,12 @@ fn main() {
             critical,
             depends_on,
         } => commands::add::run(ctx, claim, proof, literal, file, kind, critical, depends_on),
-        Commands::Prove { id, cmd } => commands::prove::run(ctx, id, cmd),
+        Commands::Prove {
+            id,
+            cmd,
+            all,
+            stale_only,
+        } => commands::prove::run(ctx, id, cmd, all, stale_only),
         Commands::Gate { hook_mode } => commands::gate::run(ctx, hook_mode),
         Commands::Seed { manifest, force } => commands::seed::run(ctx, manifest, force),
         Commands::Status => commands::status::run(ctx),

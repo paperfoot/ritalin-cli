@@ -1297,3 +1297,172 @@ fn depends_on_empty_falls_back_to_global_workspace_hash() {
     std::fs::write(dir.join("new.txt"), "x").unwrap();
     ritalin().args(["gate"]).current_dir(dir).assert().failure();
 }
+
+// ─── prove --all and --stale-only ───────────────────────────────
+//
+// The "for id in O-001..O-N; do ritalin prove $id; done" loop the user ran
+// 6× in session 2026-05-13. Now one command.
+
+#[test]
+fn prove_all_runs_every_obligation() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    add_in(dir, "first", "true");
+    add_in(dir, "second", "true");
+    add_in(dir, "third", "true");
+
+    let out = ritalin()
+        .args(["prove", "--all", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "prove --all should exit 0 when all pass");
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let summary = &json["data"]["summary"];
+    assert_eq!(summary["total"], 3);
+    assert_eq!(summary["discharged"], 3);
+    assert_eq!(summary["failed"], 0);
+    assert_eq!(summary["skipped"], 0);
+}
+
+#[test]
+fn prove_all_continues_on_failure() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    add_in(dir, "passes", "true");
+    add_in(dir, "fails", "false");
+    add_in(dir, "also passes", "true");
+
+    let out = ritalin()
+        .args(["prove", "--all", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(
+        !out.status.success(),
+        "prove --all should exit non-zero when any obligation fails"
+    );
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let summary = &json["data"]["summary"];
+    assert_eq!(summary["total"], 3);
+    assert_eq!(summary["discharged"], 2);
+    assert_eq!(summary["failed"], 1);
+
+    // The failed obligation didn't stop the run — third one was also tried.
+    let proved = json["data"]["proved"].as_array().unwrap();
+    assert_eq!(proved.len(), 3);
+    assert_eq!(proved[0]["obligation_id"], "O-001");
+    assert_eq!(proved[1]["obligation_id"], "O-002");
+    assert_eq!(proved[2]["obligation_id"], "O-003");
+}
+
+#[test]
+fn prove_all_stale_only_skips_already_passing() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    add_in(dir, "first", "true");
+    add_in(dir, "second", "true");
+
+    // Discharge O-001 explicitly so its evidence is fresh.
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    let out = ritalin()
+        .args(["prove", "--all", "--stale-only", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let summary = &json["data"]["summary"];
+    assert_eq!(summary["skipped"], 1, "O-001 was already passing");
+    assert_eq!(summary["discharged"], 1, "O-002 got proved");
+
+    let skipped = json["data"]["skipped"].as_array().unwrap();
+    assert_eq!(skipped[0]["obligation_id"], "O-001");
+}
+
+#[test]
+fn prove_id_required_when_not_all() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+    add_in(dir, "thing", "true");
+
+    // Missing id without --all should fail to parse.
+    ritalin()
+        .args(["prove"])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn prove_warns_when_proof_mutates_workspace() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    // Set up git so workspace_hash works deterministically.
+    std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.email", "t@t"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["config", "user.name", "t"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::fs::write(dir.join("seed.txt"), "v1").unwrap();
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    std::process::Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    init_in(dir);
+
+    // Proof that rewrites its dependency file (think: a formatter pass).
+    ritalin()
+        .args([
+            "add",
+            "self-mutating proof",
+            "--proof",
+            "echo mutated > seed.txt",
+            "--depends-on",
+            "seed.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    let out = ritalin()
+        .args(["prove", "O-001", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["data"]["workspace_mutated"], true);
+}

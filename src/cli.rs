@@ -119,13 +119,28 @@ pub enum Commands {
         depends_on: Vec<String>,
     },
 
-    /// Run a verification command and record evidence for an obligation
+    /// Run a verification command and record evidence for an obligation.
+    ///
+    /// With `--all`, re-prove every obligation in order (continues on failure
+    /// so the summary surfaces every red obligation). With `--stale-only`,
+    /// skip obligations whose evidence is already fresh — useful as the
+    /// post-commit "refresh just what changed" call.
     Prove {
-        /// Obligation ID (e.g. O-001)
-        id: String,
-        /// Override the proof command (optional; default uses obligation's stored proof)
-        #[arg(long)]
+        /// Obligation ID (e.g. O-001). Omit when using `--all`.
+        #[arg(required_unless_present = "all", conflicts_with = "all")]
+        id: Option<String>,
+        /// Override the proof command (single-id mode only; doesn't bypass
+        /// the gate — proof_hash mismatch keeps the obligation open).
+        #[arg(long, conflicts_with = "all")]
         cmd: Option<String>,
+        /// Re-prove every obligation in add-order. Continues on failure;
+        /// the result envelope reports passed / failed / skipped counts.
+        #[arg(long)]
+        all: bool,
+        /// With `--all`, only run obligations whose current evidence is
+        /// not already passing/fresh (missing, failed, stale, mismatch).
+        #[arg(long, requires = "all")]
+        stale_only: bool,
     },
 
     /// Stop hook gate. Blocks unless every critical obligation has evidence.
