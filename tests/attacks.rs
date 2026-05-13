@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 fn ritalin() -> Command {
@@ -21,10 +22,15 @@ fn add_in(dir: &std::path::Path, claim: &str, proof: &str) {
         .success();
 }
 
-// ─── Attack: forged evidence append ─────────────────────────
-// An agent could try to write a fake exit-0 record directly to evidence.jsonl.
-// With proof_hash + workspace_hash binding, forged records won't have matching
-// hashes and therefore won't discharge the obligation.
+fn proof_hash(cmd: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(cmd.trim().as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+// ─── Attack: forged evidence append (zero-hash, trivial) ─────
+// Baseline: anyone can append a record. With wrong hashes the gate
+// rejects it.
 
 #[test]
 fn forged_evidence_does_not_discharge() {
@@ -53,6 +59,74 @@ fn forged_evidence_does_not_discharge() {
     ritalin().args(["gate"]).current_dir(dir).assert().failure();
 
     assert!(dir.join(".task-incomplete").exists());
+}
+
+// ─── Attack: forged evidence with hash matching the obligation ─
+// The real attack class observed in production (codex agent rewriting
+// evidence.jsonl). The attacker reads the obligation's stored proof_cmd,
+// computes its sha256, writes an evidence record with `command: <garbage>`
+// but `proof_hash: <hash of obligation.proof_cmd>`. Pre-fix, gate trusted
+// the stored proof_hash field and accepted the record. Post-fix, gate
+// recomputes proof_hash from `r.command` and rejects.
+
+#[test]
+fn forged_evidence_with_matching_proof_hash_does_not_discharge() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "must run real proof", "echo real_check");
+
+    // Run prove honestly so we capture the current workspace_hash.
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+    let evidence_path = dir.join(".ritalin/evidence.jsonl");
+    let real_line = std::fs::read_to_string(&evidence_path)
+        .unwrap()
+        .lines()
+        .next()
+        .unwrap()
+        .to_string();
+    let real_record: serde_json::Value = serde_json::from_str(&real_line).unwrap();
+    let ws_hash = real_record["workspace_hash"].as_str().unwrap().to_string();
+
+    // Wipe the genuine evidence and replace with a forged record whose
+    // command is something the agent NEVER ran but whose stored proof_hash
+    // matches the obligation's proof_cmd. This is the "Codex synthesised
+    // evidence" attack from session 2026-05-13.
+    let forged_proof_hash = proof_hash("echo real_check");
+    let forged = serde_json::json!({
+        "obligation_id": "O-001",
+        "command": "echo bypass",
+        "exit_code": 0,
+        "stdout_tail": "",
+        "stderr_tail": "",
+        "proof_hash": forged_proof_hash,
+        "workspace_hash": ws_hash,
+        "recorded_at": "2026-05-13T12:00:00Z"
+    });
+    std::fs::write(&evidence_path, format!("{}\n", forged)).unwrap();
+
+    // With Fix A: gate recomputes proof_hash from r.command = "echo bypass"
+    // = sha256("echo bypass") which does NOT match sha256("echo real_check").
+    // Forgery rejected.
+    ritalin().args(["gate"]).current_dir(dir).assert().failure();
+    assert!(dir.join(".task-incomplete").exists());
+
+    // Status should classify the forgery as proof_mismatch (informational).
+    let status = ritalin()
+        .args(["status", "--json"])
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert_eq!(
+        json["data"]["obligations"][0]["evidence_status"],
+        "proof_mismatch"
+    );
 }
 
 // ─── Attack: stale evidence after regression ────────────────

@@ -74,9 +74,20 @@ pub fn index_by_obligation(state_dir: &Path) -> Result<HashMap<String, Vec<Evide
     Ok(map)
 }
 
-/// Returns true if the obligation has at least one passing record with
-/// matching proof_hash and workspace_hash. Empty hashes (v0.1.x records)
-/// are treated as non-matching so legacy evidence cannot discharge.
+/// Returns true if the obligation has at least one passing record whose
+/// `command` field hashes to the expected proof and whose workspace_hash
+/// matches the current workspace.
+///
+/// We deliberately recompute the proof hash from `r.command` instead of
+/// trusting the stored `r.proof_hash` field. Trusting the stored field
+/// allows an attacker to append a forged record where `command` is anything
+/// and `proof_hash` is set to the obligation's expected hash (which is
+/// readable from `obligations.jsonl`). Recomputing from `r.command` forces
+/// the recorded command to actually be the obligation's proof_cmd before
+/// the record can discharge.
+///
+/// Legacy v0.1.x records that lack a `command` field, or evidence with no
+/// workspace_hash, cannot discharge.
 pub fn is_discharged(
     records: &[Evidence],
     expected_proof_hash: &str,
@@ -84,9 +95,9 @@ pub fn is_discharged(
 ) -> bool {
     records.iter().any(|r| {
         r.exit_code == 0
-            && !r.proof_hash.is_empty()
+            && !r.command.is_empty()
             && !r.workspace_hash.is_empty()
-            && r.proof_hash == expected_proof_hash
+            && proof_hash(&r.command) == expected_proof_hash
             && r.workspace_hash == current_workspace_hash
     })
 }
@@ -148,24 +159,32 @@ pub fn classify(
         return EvidenceState::Passed;
     }
 
+    // Recompute the proof hash from `r.command` for the same reason
+    // is_discharged does — the stored `proof_hash` field is informational
+    // and not trusted for verification.
+    let cmd_matches_proof = |r: &Evidence| -> bool {
+        !r.command.is_empty() && proof_hash(&r.command) == expected_proof_hash
+    };
+
     if records.iter().any(|r| {
         r.exit_code == 0
-            && r.proof_hash == expected_proof_hash
+            && cmd_matches_proof(r)
             && !r.workspace_hash.is_empty()
             && r.workspace_hash != current_workspace_hash
     }) {
         return EvidenceState::StaleWorkspace;
     }
 
-    if records.iter().any(|r| {
-        r.exit_code == 0 && !r.proof_hash.is_empty() && r.proof_hash != expected_proof_hash
-    }) {
+    if records
+        .iter()
+        .any(|r| r.exit_code == 0 && !r.command.is_empty() && !cmd_matches_proof(r))
+    {
         return EvidenceState::ProofMismatch;
     }
 
     if records
         .iter()
-        .any(|r| r.exit_code == 0 && (r.proof_hash.is_empty() || r.workspace_hash.is_empty()))
+        .any(|r| r.exit_code == 0 && (r.command.is_empty() || r.workspace_hash.is_empty()))
     {
         return EvidenceState::Legacy;
     }
@@ -177,85 +196,133 @@ pub fn classify(
 mod tests {
     use super::*;
 
-    fn make_evidence(exit_code: i32, proof_hash: &str, workspace_hash: &str) -> Evidence {
+    /// Build an Evidence record for a given executed command, mirroring
+    /// what `prove.rs` writes. The `proof_hash` field is computed from the
+    /// command (matching production behaviour); is_discharged ignores the
+    /// stored field and recomputes anyway.
+    fn ev(command: &str, exit_code: i32, workspace_hash: &str) -> Evidence {
         Evidence {
             obligation_id: "O-001".into(),
-            command: "true".into(),
+            command: command.into(),
             exit_code,
             stdout_tail: String::new(),
             stderr_tail: String::new(),
-            proof_hash: proof_hash.into(),
+            proof_hash: proof_hash(command),
             workspace_hash: workspace_hash.into(),
             recorded_at: chrono::Utc::now(),
         }
     }
 
-    const GOOD_PH: &str = "abc123";
+    /// Variant for tests that need to exercise a forged stored proof_hash
+    /// field — i.e. evidence whose `proof_hash` field LIES about its
+    /// `command`. Pre-fix this would discharge; post-fix is_discharged
+    /// recomputes from `command` and rejects.
+    fn ev_with_forged_hash(
+        command: &str,
+        exit_code: i32,
+        workspace_hash: &str,
+        forged_proof_hash: &str,
+    ) -> Evidence {
+        Evidence {
+            obligation_id: "O-001".into(),
+            command: command.into(),
+            exit_code,
+            stdout_tail: String::new(),
+            stderr_tail: String::new(),
+            proof_hash: forged_proof_hash.into(),
+            workspace_hash: workspace_hash.into(),
+            recorded_at: chrono::Utc::now(),
+        }
+    }
+
+    const GOOD_CMD: &str = "true";
     const GOOD_WH: &str = "def456";
+
+    fn good_ph() -> String {
+        proof_hash(GOOD_CMD)
+    }
 
     #[test]
     fn empty_records_not_discharged() {
-        assert!(!is_discharged(&[], GOOD_PH, GOOD_WH));
+        assert!(!is_discharged(&[], &good_ph(), GOOD_WH));
     }
 
     #[test]
     fn all_failing_not_discharged() {
         let recs = vec![
-            make_evidence(1, GOOD_PH, GOOD_WH),
-            make_evidence(2, GOOD_PH, GOOD_WH),
-            make_evidence(-1, GOOD_PH, GOOD_WH),
+            ev(GOOD_CMD, 1, GOOD_WH),
+            ev(GOOD_CMD, 2, GOOD_WH),
+            ev(GOOD_CMD, -1, GOOD_WH),
         ];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
-    fn one_passing_with_matching_hashes_discharges() {
-        let recs = vec![
-            make_evidence(1, GOOD_PH, GOOD_WH),
-            make_evidence(0, GOOD_PH, GOOD_WH),
-        ];
-        assert!(is_discharged(&recs, GOOD_PH, GOOD_WH));
+    fn one_passing_with_matching_command_discharges() {
+        let recs = vec![ev(GOOD_CMD, 1, GOOD_WH), ev(GOOD_CMD, 0, GOOD_WH)];
+        assert!(is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
-    fn passing_with_wrong_proof_hash_not_discharged() {
-        let recs = vec![make_evidence(0, "wrong", GOOD_WH)];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+    fn passing_with_wrong_command_not_discharged() {
+        // command="echo bypass" hashes to something other than expected.
+        let recs = vec![ev("echo bypass", 0, GOOD_WH)];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
     fn passing_with_wrong_workspace_hash_not_discharged() {
-        let recs = vec![make_evidence(0, GOOD_PH, "stale")];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+        let recs = vec![ev(GOOD_CMD, 0, "stale")];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
-    fn empty_proof_hash_not_discharged() {
-        let recs = vec![make_evidence(0, "", GOOD_WH)];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+    fn empty_command_not_discharged() {
+        let recs = vec![ev("", 0, GOOD_WH)];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
     fn empty_workspace_hash_not_discharged() {
-        let recs = vec![make_evidence(0, GOOD_PH, "")];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+        let recs = vec![ev(GOOD_CMD, 0, "")];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
     fn legacy_v01x_evidence_not_discharged() {
-        let recs = vec![make_evidence(0, "", "")];
-        assert!(!is_discharged(&recs, GOOD_PH, GOOD_WH));
+        // Empty command + empty workspace hash. The shape v0.1.x wrote.
+        let recs = vec![ev("", 0, "")];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
     }
 
     #[test]
     fn mixed_pass_fail_with_one_valid_discharges() {
         let recs = vec![
-            make_evidence(1, GOOD_PH, GOOD_WH),
-            make_evidence(0, "wrong", GOOD_WH),
-            make_evidence(0, GOOD_PH, "stale"),
-            make_evidence(0, GOOD_PH, GOOD_WH), // this one counts
+            ev(GOOD_CMD, 1, GOOD_WH),
+            ev("echo bypass", 0, GOOD_WH),
+            ev(GOOD_CMD, 0, "stale"),
+            ev(GOOD_CMD, 0, GOOD_WH), // this one counts
         ];
-        assert!(is_discharged(&recs, GOOD_PH, GOOD_WH));
+        assert!(is_discharged(&recs, &good_ph(), GOOD_WH));
+    }
+
+    /// Fix A regression test: a record whose stored `proof_hash` field is
+    /// forged to match the obligation's expected hash, but whose `command`
+    /// hashes to something else, must NOT discharge.
+    #[test]
+    fn forged_stored_proof_hash_does_not_discharge() {
+        let recs = vec![ev_with_forged_hash(
+            "echo bypass", // command the agent actually wrote
+            0,
+            GOOD_WH,
+            &good_ph(), // forged stored hash claiming "I ran the real proof"
+        )];
+        assert!(!is_discharged(&recs, &good_ph(), GOOD_WH));
+        // And classify should call this out as a proof mismatch.
+        assert_eq!(
+            classify(Some(&recs), &good_ph(), GOOD_WH),
+            EvidenceState::ProofMismatch
+        );
     }
 
     #[test]
