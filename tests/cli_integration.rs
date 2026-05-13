@@ -749,16 +749,16 @@ fn embedded_skill_md_is_under_budget_and_has_directives() {
     let skill = include_str!("../src/skill/SKILL.md");
     let line_count = skill.lines().count();
     assert!(
-        line_count <= 145,
-        "SKILL.md is {line_count} lines; budget is 145 (Anthropic skill-length research suggests under 200; tighter is better for primacy)"
+        line_count <= 100,
+        "SKILL.md is {line_count} lines; budget is 100 — short skills get followed (Anthropic skill-length research)"
     );
     assert!(
-        skill.contains("Approximation drift is a contract breach"),
+        skill.contains("If you have not read or run it in this turn, do not state it as fact"),
         "SKILL.md must carry the anti-drift warning in the primacy zone"
     );
     assert!(
-        skill.contains("BEFORE"),
-        "SKILL.md must use BEFORE/MUST imperative directives"
+        skill.contains("MUST"),
+        "SKILL.md must use imperative MUST directives where load-bearing"
     );
     assert!(
         !skill.contains("## Why this exists"),

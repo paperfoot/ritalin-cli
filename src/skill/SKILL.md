@@ -1,139 +1,85 @@
 ---
 name: ritalin
 description: >
-  Executive function for AI coding agents. Use when the user says "use
-  ritalin", "take ritalin", "take your meds", "think hard", "focus",
-  "concentrate", or is frustrated with work quality. Guides agents to research
-  before implementing, ground claims in evidence, create verifiable obligations,
-  run `ritalin prove`, and block completion with `ritalin gate` until critical
-  obligations have fresh matching evidence.
+  Evidence gate for AI coding agents. Use when the user says "use ritalin",
+  "take ritalin", "take your meds", "think hard", "focus", or is frustrated
+  with work quality. Forces the agent to declare what would prove the work
+  is done, then run those checks before claiming completion.
 metadata:
   short-description: Evidence gate for AI coding agents
 ---
 
 # ritalin
 
-Your job is to **reduce the user's uncertainty**. Evidence beats fluency. A precise incomplete report is better than a polished false completion.
+Your job is to **reduce the user's uncertainty**. State what you actually checked. A precise incomplete report beats a polished false completion.
 
-**Approximation drift is a contract breach:** if you have not read it in this turn, you MUST not state it as fact. This applies to CSS values, file contents, API shapes, config constants, version numbers, visual properties — everything.
+If you have not read or run it in this turn, do not state it as fact. That includes CSS values, file contents, API shapes, version numbers — everything.
 
-## When to invoke
+## The four commands you'll use
 
-- User says "use ritalin", "take ritalin", "take your meds", "think hard", "focus", "concentrate", "cure your adhd".
-- User is frustrated with your work quality (profanity, insults, "do better", "try harder"): apologise once, take your ritalin, do better work.
-- Automatic: non-trivial implementation (>1 file), recommending a library/model/pattern, any task where literature exists, or the repo has `.ritalin/` / `.task-incomplete` present.
+1. **Init** — say what "done" looks like:
+   ```
+   ritalin init --outcome "User can save and reload notification settings"
+   ```
 
-### If you are a delegated subagent
+2. **Add** — say what would prove each piece is done. Repeat per piece:
+   ```
+   ritalin add "settings POST works" \
+     --proof "pnpm test api/settings.test.ts" \
+     --kind integration \
+     --depends-on src/api/settings.ts
+   ```
+   - The `--proof` MUST be a real shell command that exits 0 only when the claim is true.
+   - The `--kind` is one of: `user_path`, `integration`, `failure_path`, `literal_match`, `literal_regex`, `other`. Pick the obvious one. If unsure, pick `other`.
+   - `--depends-on a.ts,b.ts` scopes freshness to those files. Use it so an unrelated commit elsewhere doesn't invalidate this obligation.
 
-You are a first-class ritalin user. Run the real proofs — `search`, `gh`, `engram`, `curl`, network, anything. The ledger doesn't care who called `prove`; it cares whether the proof passed.
+3. **Prove** — run all proofs in one shot:
+   ```
+   ritalin prove --all
+   ```
 
-- **Expect the parent's uncommitted changes** in the working tree. That's parallel work, not a problem to report. Deliver your task.
-- **Don't lie to make it pass.** If your sandbox can't reach the network a proof requires, surface that as the result. Do NOT edit `evidence.jsonl` — gate recomputes the proof hash from the recorded command and rejects forgeries.
+4. **Gate** — refuse to stop until all critical obligations have passing evidence:
+   ```
+   ritalin gate
+   ```
 
-## Discovery
+## Run `ritalin agent-info` once at session start
 
-Run `ritalin agent-info` once at session start. The manifest is the source of truth for commands, flags, and exit codes. Do not guess.
+It dumps the full command and flag manifest in JSON. Don't guess flags from this skill — read the manifest.
 
-## The five phases
+## Three rules that prevent the common failure modes
 
-**Phase 1 — Understand.** State the outcome in one sentence before touching code.
+1. **One obligation per behavior, not per file.** If a feature needs files A and B working together, that's ONE `add` with `--depends-on A,B` — not two adds. Counting obligations by file count creates sprawl and dilutes the contract.
 
-**Phase 2 — Research & ground.**
-- BEFORE stating any technical fact (library version, API shape, visual property, config value), you MUST read the source in the current turn OR run a search that returns citable results. "I remember from training" is not evidence.
-- BEFORE recommending a library, framework, or model, you MUST verify it is current with `search --mode news` or `gh search repos --sort stars`.
-- BEFORE writing a pattern, you MUST check high-quality implementations exist in the wild.
+2. **Never grep a file you wrote in the same task as the proof.** If the task is "recommend a current library" and you write `recommendation.md`, your proof CANNOT be `grep -q '...' recommendation.md` — you wrote it, of course it's there. Real proof for "is current": `search --mode news 'lib name 2026' | jq '.results | length > 0'`, `gh search repos`, `curl https://registry.npmjs.org/<pkg> | jq .time['modified']`, etc.
 
-**Phase 3 — Contract.**
+3. **Don't over-obligate trivial work.** A typo fix doesn't need a contract. If the user explicitly invokes ritalin (with words like "use ritalin", "take your meds") OR `.ritalin/` already exists in the repo, engage. Otherwise, just do the work.
+
+## Special-case kinds for verbatim claims
+
+When the obligation is "this exact string must appear in this file" (CSS values, hex colors, RFC quotes, pinned versions):
+
 ```
-ritalin init --outcome "<one-line statement of what success looks like>"
-ritalin add "<claim>" --proof "<shell command>" --kind <kind>   # repeat per obligation
-```
-BEFORE adding an obligation, the proof MUST be a shell command you can actually execute — not a description.
-
-**Phase 4 — Implement.** Grounded in what you researched, not what you hallucinated. If mid-flight you discover the approach is wrong, return to Phase 2 — don't push through.
-
-**Phase 5 — Prove & gate.**
-```
-ritalin prove O-001              # one obligation
-ritalin prove --all              # batch — re-prove every obligation in order
-ritalin prove --all --stale-only # batch — only re-prove what's actually stale
-ritalin gate                     # blocks stop until every critical obligation has evidence
-ritalin gate --summary           # one-line shell-friendly verdict for hooks/CI
-```
-BEFORE running `ritalin gate`, every open critical obligation MUST have fresh passing evidence. After commits, run `ritalin prove --all --stale-only` to refresh in one call instead of looping. BEFORE ending a turn in a project with `.task-incomplete` present, you MUST run `ritalin gate --hook-mode` and act on its output.
-
-## Obligation kinds
-
-| kind | when to use |
-|---|---|
-| `user_path` | user-visible behaviour from input to outcome |
-| `integration` | UI ↔ API ↔ DB wiring is real, not stubbed |
-| `persistence` | state survives reload, restart, redeploy |
-| `failure_path` | error states render and recover |
-| `performance` | measurable speed/resource targets |
-| `security` | auth, validation, secrets handling |
-| `research_grounded` | approach is grounded in papers / documented best practices |
-| `code_referenced` | pattern follows real-world examples from high-star repos |
-| `model_current` | library/model/tool recommendations are current, not stale |
-| `literal_match` | verbatim string must appear in a file — kills approximation drift |
-| `literal_regex` | POSIX ERE pattern must match in a file — for semantic claims that have multiple correct spellings |
-| `other` | fallback |
-
-## literal_match — the anti-approximation-drift shortcut
-
-For exact-value claims (CSS properties, hex colours, pinned versions, config constants, API strings) use `literal_match` instead of writing the grep by hand:
-
-```bash
-ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
+ritalin add "border-radius is 0" \
   --kind literal_match \
-  --literal 'rgba(7,9,7,0.54)' \
-  --file src/components/home/SectionHero.tsx
+  --literal '.btn { border-radius: 0' \
+  --file src/styles.css
 ```
 
-Ritalin synthesises `grep -F -- '<literal>' '<file>'`. Gotchas: `grep -F` matches anywhere including comments, so include structural context in the literal (`.btn { border-radius: 0`); match is case- and whitespace-sensitive (that's the point).
+For semantic claims with multiple valid spellings, use `literal_regex` with a POSIX ERE pattern (use `[[:space:]]` not `\s`, alternatives via `(A|B)`).
 
-For semantic claims where spelling can vary (e.g. `if (x)` vs `if (x != null)`), use `--kind literal_regex --regex <POSIX-ERE>`. Synthesises `grep -E`. Use `[[:space:]]` not `\s`, alternatives via `(A|B)`.
+## Subagent note
 
-## Per-obligation file dependencies (`--depends-on`)
+If you're a delegated subagent, you're a first-class ritalin user. Run real proofs with full network and CLI access. Don't refuse to engage just because you're delegated. Don't lie to make a proof pass — `gate` recomputes the proof hash from the recorded command and rejects forged records. The right failure mode is "blocker: I can't reach X from this sandbox" — not editing the ledger.
 
-By default, any commit invalidates every obligation's evidence. To scope to specific files (so a teammate's unrelated commit doesn't churn yours):
-
-```bash
-ritalin add "settings POST works" \
-  --proof "pnpm test api/settings.contract.ts" \
-  --kind integration \
-  --depends-on src/api/settings.ts,test/api/settings.contract.ts
-```
-
-Comma-separated, repo-relative paths only (no `..`, no absolute). Files must exist at prove time.
-
-## Proof commands that compose
-
-Any CLI that returns exit 0/1 is a valid proof:
-
-```bash
-ritalin add "Approach has research backing" \
-  --proof "search --mode scholar 'topic' --json | jq '.results | length > 0'" \
-  --kind research_grounded
-
-ritalin add "Pattern matches community practice" \
-  --proof "gh search repos 'pattern query' --sort stars --limit 5 --json name | jq 'length > 0'" \
-  --kind code_referenced
-```
-
-## Delegating to subagents
-
-If you spawn a subagent via the Task/Agent tool, it has no idea `.ritalin/` exists — isolated context, own system prompt, depth=1, only the summary returns. BEFORE delegating, run `ritalin export-contract` and paste the output into the delegation prompt. That briefing includes the outcome, open obligations, required return format, and explicit don'ts so the subagent stays inside your contract.
-
-## Anti-patterns
-
-- Do NOT skip Phase 2 research. Hallucinating when `search` / `gh` / `engram` are right there is the #1 failure this skill exists to prevent.
-- Do NOT add obligations you cannot verify with a shell command. Vague claims ("looks nice", "works well") must be converted to measurable commands or removed.
-- Do NOT mark obligations `--critical false` to let the gate pass. If it's not critical, it shouldn't be in the ledger.
-- Do NOT delete or edit `.ritalin/obligations.jsonl` or `.ritalin/evidence.jsonl` directly. Both are append-only by design. Forging an evidence record (writing `proof_hash: <obligation's hash>` with `command: <anything>`) is detected — `gate` recomputes the hash from the recorded command and rejects mismatches.
-- Do NOT remove `.task-incomplete` manually. Only `ritalin gate` may remove it.
-- Do NOT pass `--cmd <override>` to `prove` thinking it'll discharge the obligation faster. The recorded `command` won't match the obligation's stored proof; gate rejects it as `proof_mismatch`. `--cmd` is a diagnostic-only flag.
+Expect the parent's uncommitted changes in the working tree. That's parallel work, not your concern.
 
 ## When the gate blocks
 
-Read the `reason` field — it names the missing obligation and the command to run. Run it. If the proof fails, fix the underlying problem, then re-run `ritalin prove <id>`. Do not weaken the obligation to make the failure go away — the failing obligation is information.
+Read the `reason` field — it names the obligation and the command to run. Run it. If the proof fails, fix the underlying problem; don't weaken the obligation. The failing obligation is information.
+
+## Useful flags you might miss
+
+- `ritalin gate --summary` — one-line shell-friendly verdict for hooks/CI.
+- `ritalin prove --all --stale-only` — re-prove only what changed since last run. Idiomatic after a commit.
+- `ritalin export-contract` — paste the output into a subagent prompt before delegating.
