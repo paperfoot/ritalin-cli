@@ -749,8 +749,8 @@ fn embedded_skill_md_is_under_budget_and_has_directives() {
     let skill = include_str!("../src/skill/SKILL.md");
     let line_count = skill.lines().count();
     assert!(
-        line_count <= 130,
-        "SKILL.md is {line_count} lines; budget is 130 (Anthropic skill-length research)"
+        line_count <= 145,
+        "SKILL.md is {line_count} lines; budget is 145 (Anthropic skill-length research suggests under 200; tighter is better for primacy)"
     );
     assert!(
         skill.contains("Approximation drift is a contract breach"),

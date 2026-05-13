@@ -23,6 +23,13 @@ Your job is to **reduce the user's uncertainty**. Evidence beats fluency. A prec
 - User is frustrated with your work quality (profanity, insults, "do better", "try harder"): apologise once, take your ritalin, do better work.
 - Automatic: non-trivial implementation (>1 file), recommending a library/model/pattern, any task where literature exists, or the repo has `.ritalin/` / `.task-incomplete` present.
 
+### If you are a delegated subagent
+
+You are a first-class ritalin user. Run the real proofs — `search`, `gh`, `engram`, `curl`, network, anything. The ledger doesn't care who called `prove`; it cares whether the proof passed.
+
+- **Expect the parent's uncommitted changes** in the working tree. That's parallel work, not a problem to report. Deliver your task.
+- **Don't lie to make it pass.** If your sandbox can't reach the network a proof requires, surface that as the result. Do NOT edit `evidence.jsonl` — gate recomputes the proof hash from the recorded command and rejects forgeries.
+
 ## Discovery
 
 Run `ritalin agent-info` once at session start. The manifest is the source of truth for commands, flags, and exit codes. Do not guess.
@@ -47,10 +54,13 @@ BEFORE adding an obligation, the proof MUST be a shell command you can actually 
 
 **Phase 5 — Prove & gate.**
 ```
-ritalin prove O-001         # runs the stored proof, records evidence
-ritalin gate                # blocks stop until every critical obligation has evidence
+ritalin prove O-001              # one obligation
+ritalin prove --all              # batch — re-prove every obligation in order
+ritalin prove --all --stale-only # batch — only re-prove what's actually stale
+ritalin gate                     # blocks stop until every critical obligation has evidence
+ritalin gate --summary           # one-line shell-friendly verdict for hooks/CI
 ```
-BEFORE running `ritalin gate`, you MUST have run `ritalin prove` for every open obligation. BEFORE ending a turn in a project with `.task-incomplete` present, you MUST run `ritalin gate --hook-mode` and act on its output.
+BEFORE running `ritalin gate`, every open critical obligation MUST have fresh passing evidence. After commits, run `ritalin prove --all --stale-only` to refresh in one call instead of looping. BEFORE ending a turn in a project with `.task-incomplete` present, you MUST run `ritalin gate --hook-mode` and act on its output.
 
 ## Obligation kinds
 
@@ -66,6 +76,7 @@ BEFORE running `ritalin gate`, you MUST have run `ritalin prove` for every open 
 | `code_referenced` | pattern follows real-world examples from high-star repos |
 | `model_current` | library/model/tool recommendations are current, not stale |
 | `literal_match` | verbatim string must appear in a file — kills approximation drift |
+| `literal_regex` | POSIX ERE pattern must match in a file — for semantic claims that have multiple correct spellings |
 | `other` | fallback |
 
 ## literal_match — the anti-approximation-drift shortcut
@@ -80,6 +91,21 @@ ritalin add "Hero overlay is rgba(7,9,7,0.54)" \
 ```
 
 Ritalin synthesises `grep -F -- '<literal>' '<file>'`. Gotchas: `grep -F` matches anywhere including comments, so include structural context in the literal (`.btn { border-radius: 0`); match is case- and whitespace-sensitive (that's the point).
+
+For semantic claims where spelling can vary (e.g. `if (x)` vs `if (x != null)`), use `--kind literal_regex --regex <POSIX-ERE>`. Synthesises `grep -E`. Use `[[:space:]]` not `\s`, alternatives via `(A|B)`.
+
+## Per-obligation file dependencies (`--depends-on`)
+
+By default, any commit invalidates every obligation's evidence. To scope to specific files (so a teammate's unrelated commit doesn't churn yours):
+
+```bash
+ritalin add "settings POST works" \
+  --proof "pnpm test api/settings.contract.ts" \
+  --kind integration \
+  --depends-on src/api/settings.ts,test/api/settings.contract.ts
+```
+
+Comma-separated, repo-relative paths only (no `..`, no absolute). Files must exist at prove time.
 
 ## Proof commands that compose
 
@@ -104,8 +130,9 @@ If you spawn a subagent via the Task/Agent tool, it has no idea `.ritalin/` exis
 - Do NOT skip Phase 2 research. Hallucinating when `search` / `gh` / `engram` are right there is the #1 failure this skill exists to prevent.
 - Do NOT add obligations you cannot verify with a shell command. Vague claims ("looks nice", "works well") must be converted to measurable commands or removed.
 - Do NOT mark obligations `--critical false` to let the gate pass. If it's not critical, it shouldn't be in the ledger.
-- Do NOT delete or edit `.ritalin/obligations.jsonl` or `.ritalin/evidence.jsonl` directly. Both are append-only by design.
+- Do NOT delete or edit `.ritalin/obligations.jsonl` or `.ritalin/evidence.jsonl` directly. Both are append-only by design. Forging an evidence record (writing `proof_hash: <obligation's hash>` with `command: <anything>`) is detected — `gate` recomputes the hash from the recorded command and rejects mismatches.
 - Do NOT remove `.task-incomplete` manually. Only `ritalin gate` may remove it.
+- Do NOT pass `--cmd <override>` to `prove` thinking it'll discharge the obligation faster. The recorded `command` won't match the obligation's stored proof; gate rejects it as `proof_mismatch`. `--cmd` is a diagnostic-only flag.
 
 ## When the gate blocks
 
