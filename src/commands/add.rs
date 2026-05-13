@@ -28,6 +28,14 @@ fn synth_literal_match(literal: &str, file: &str) -> String {
     format!("grep -F -- {} {}", sh_quote(literal), sh_quote(file))
 }
 
+/// Synthesise the proof command for a literal_regex obligation:
+/// `grep -E -- <quoted-pattern> <quoted-file>`. `-E` enables POSIX
+/// extended-regex (no PCRE). `--` ensures patterns starting with `-` aren't
+/// parsed as grep flags.
+fn synth_literal_regex(pattern: &str, file: &str) -> String {
+    format!("grep -E -- {} {}", sh_quote(pattern), sh_quote(file))
+}
+
 /// Normalize a list of dependency paths: trim, drop empties, sort, dedupe,
 /// reject anything that escapes the repo (absolute paths or `..` segments).
 /// Returns the canonical list ready for storage on the obligation.
@@ -65,6 +73,7 @@ pub fn run(
     claim: String,
     proof: Option<String>,
     literal: Option<String>,
+    regex: Option<String>,
     file: Option<String>,
     kind: ObligationKind,
     critical: bool,
@@ -87,15 +96,17 @@ pub fn run(
     // be added before the file lands.
     let depends_on = normalize_depends_on(depends_on)?;
 
-    // clap has already enforced:
-    //   proof XOR (literal AND file); literal ↔ file; at least one path chosen.
+    // clap has already enforced exactly one of {proof, literal+file, regex+file}.
     // Only kind consistency is validated here.
-    let proof_cmd = match (proof, literal.as_deref(), file.as_deref()) {
-        (Some(p), None, None) => {
-            if matches!(kind, ObligationKind::LiteralMatch) {
-                return Err(AppError::InvalidInput(
-                    "--kind literal_match requires --literal and --file, not --proof".into(),
-                ));
+    let proof_cmd = match (proof, literal.as_deref(), regex.as_deref(), file.as_deref()) {
+        (Some(p), None, None, None) => {
+            if matches!(
+                kind,
+                ObligationKind::LiteralMatch | ObligationKind::LiteralRegex
+            ) {
+                return Err(AppError::InvalidInput(format!(
+                    "--kind {kind} requires --literal/--regex and --file, not --proof"
+                )));
             }
             let p = p.trim().to_string();
             if p.is_empty() {
@@ -105,7 +116,7 @@ pub fn run(
             }
             p
         }
-        (None, Some(lit), Some(f)) => {
+        (None, Some(lit), None, Some(f)) => {
             if !matches!(kind, ObligationKind::LiteralMatch) {
                 return Err(AppError::InvalidInput(
                     "--literal and --file require --kind literal_match".into(),
@@ -119,7 +130,23 @@ pub fn run(
             }
             synth_literal_match(lit, f)
         }
-        _ => unreachable!("clap constraints guarantee exactly one of proof or literal+file"),
+        (None, None, Some(pat), Some(f)) => {
+            if !matches!(kind, ObligationKind::LiteralRegex) {
+                return Err(AppError::InvalidInput(
+                    "--regex and --file require --kind literal_regex".into(),
+                ));
+            }
+            if pat.is_empty() {
+                return Err(AppError::InvalidInput("--regex cannot be empty".into()));
+            }
+            if f.is_empty() {
+                return Err(AppError::InvalidInput("--file cannot be empty".into()));
+            }
+            synth_literal_regex(pat, f)
+        }
+        _ => unreachable!(
+            "clap constraints guarantee exactly one of proof, literal+file, or regex+file"
+        ),
     };
 
     let id = obligations::next_id(&dir)?;

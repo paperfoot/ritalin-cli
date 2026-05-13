@@ -1533,3 +1533,150 @@ fn gate_summary_empty_contract() {
         "verdict=fail critical_open=0 advisory_open=0 total=0 blocking=empty"
     );
 }
+
+// ─── literal_regex obligation kind ──────────────────────────────
+//
+// The literal_match brittleness: user writes `if (p.crossover != null)` but
+// the obligation says `if (p.crossover)`. literal_match (grep -F) misses.
+// literal_regex (grep -E) lets the user express "either spelling" via a
+// pattern.
+
+#[test]
+fn literal_regex_matches_when_pattern_present() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    // User-equivalent code: semantically correct null-check.
+    std::fs::write(
+        dir.join("filters.ts"),
+        "if (p.crossover != null) f.crossover = p.crossover;\n",
+    )
+    .unwrap();
+
+    // Pattern allows both `if (p.crossover)` and `if (p.crossover != null)`.
+    ritalin()
+        .args([
+            "add",
+            "user-set crossover wins",
+            "--kind",
+            "literal_regex",
+            "--regex",
+            r"if \(p\.crossover( != null)?\) f\.crossover = p\.crossover",
+            "--file",
+            "filters.ts",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+}
+
+#[test]
+fn literal_regex_fails_when_pattern_absent() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(dir.join("filters.ts"), "completely unrelated content\n").unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "needs crossover wiring",
+            "--kind",
+            "literal_regex",
+            "--regex",
+            r"f\.crossover\s*=\s*p\.crossover",
+            "--file",
+            "filters.ts",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    // grep -E exits non-zero → prove fails.
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn literal_regex_handles_alternation() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(dir.join("a.txt"), "alpha\n").unwrap();
+
+    ritalin()
+        .args([
+            "add",
+            "alpha or beta",
+            "--kind",
+            "literal_regex",
+            "--regex",
+            "alpha|beta",
+            "--file",
+            "a.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .success();
+
+    ritalin()
+        .args(["prove", "O-001"])
+        .current_dir(dir)
+        .assert()
+        .success();
+}
+
+#[test]
+fn literal_regex_kind_with_proof_is_rejected() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    ritalin()
+        .args([
+            "add",
+            "wrong combo",
+            "--kind",
+            "literal_regex",
+            "--proof",
+            "true",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}
+
+#[test]
+fn literal_regex_without_kind_is_rejected() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+    init_in(dir);
+
+    std::fs::write(dir.join("a.txt"), "alpha\n").unwrap();
+
+    // Default kind is "other"; --regex requires --kind literal_regex.
+    ritalin()
+        .args([
+            "add",
+            "missing kind",
+            "--regex",
+            "alpha",
+            "--file",
+            "a.txt",
+        ])
+        .current_dir(dir)
+        .assert()
+        .failure();
+}

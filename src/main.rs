@@ -67,11 +67,14 @@ fn main() {
             claim,
             proof,
             literal,
+            regex,
             file,
             kind,
             critical,
             depends_on,
-        } => commands::add::run(ctx, claim, proof, literal, file, kind, critical, depends_on),
+        } => commands::add::run(
+            ctx, claim, proof, literal, regex, file, kind, critical, depends_on,
+        ),
         Commands::Prove {
             id,
             cmd,
