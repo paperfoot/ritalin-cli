@@ -69,3 +69,39 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
+
+  bump-homebrew:
+    name: Bump Homebrew formula
+    needs: [build, publish-crate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for tap token
+        id: token
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -n "$TAP_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::HOMEBREW_TAP_TOKEN secret not set — Formula/ritalin.rb in 199-biotechnologies/homebrew-tap must be bumped manually"
+          fi
+
+      - name: Update formula to ${{ github.ref_name }}
+        if: steps.token.outputs.present == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
+          sha=$(curl -sL --fail "$url" | shasum -a 256 | cut -d' ' -f1)
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/199-biotechnologies/homebrew-tap.git" tap
+          cd tap
+          sed -i -E "s|^  url \".*\"$|  url \"${url}\"|" Formula/ritalin.rb
+          sed -i -E "s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" Formula/ritalin.rb
+          grep -F "refs/tags/${tag}.tar.gz" Formula/ritalin.rb
+          grep -F "${sha}" Formula/ritalin.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "ritalin ${tag}"
+          git push
