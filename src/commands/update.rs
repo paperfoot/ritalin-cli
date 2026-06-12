@@ -14,8 +14,8 @@ pub fn run(ctx: Ctx, check: bool) -> Result<(), AppError> {
     let current = env!("CARGO_PKG_VERSION");
 
     let updater = self_update::backends::github::Update::configure()
-        .repo_owner("199-biotechnologies")
-        .repo_name("ritalin")
+        .repo_owner("paperfoot")
+        .repo_name("ritalin-cli")
         .bin_name("ritalin")
         .current_version(current)
         .build()
