@@ -19,3 +19,12 @@
 
 # Local test scratchpad
 /tmp/
+
+# Local Claude Code cache
+/.claude/tsc-cache/
+
+# NotebookLM-generated marketing media (hundreds of MB)
+/notebooklm-assets/
+
+# Downloaded ARC-AGI-3 benchmark environments
+/environment_files/
