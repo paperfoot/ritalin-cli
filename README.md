@@ -248,7 +248,7 @@ Full findings: [bench/arc-agi-3/FINDINGS.md](bench/arc-agi-3/FINDINGS.md)
 
 ## Contributing
 
-This is v0.1. The roadmap is open. The biggest open questions:
+The roadmap is open. The biggest open questions:
 
 - **Proof templates** — pre-built proof commands for `research_grounded`, `code_referenced`, and `model_current` obligation kinds that compose with ecosystem CLIs
 - **Diff compiler** — `ritalin compile` infers obligations from `git diff` + a `patterns.yaml` library
