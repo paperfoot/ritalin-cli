@@ -75,33 +75,42 @@ jobs:
     needs: [build, publish-crate]
     runs-on: ubuntu-latest
     steps:
-      - name: Check for tap token
-        id: token
+      - name: Check for deploy key
+        id: cred
         env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
-          if [ -n "$TAP_TOKEN" ]; then
+          if [ -n "$DEPLOY_KEY" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::HOMEBREW_TAP_TOKEN secret not set — Formula/ritalin.rb in 199-biotechnologies/homebrew-tap must be bumped manually"
+            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY secret not set — Formula/ritalin.rb in 199-biotechnologies/homebrew-tap must be bumped manually"
           fi
 
       - name: Update formula to ${{ github.ref_name }}
-        if: steps.token.outputs.present == 'true'
+        if: steps.cred.outputs.present == 'true'
         env:
-          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
         run: |
           set -euo pipefail
+          mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/tap_key"
+          chmod 600 "$HOME/.ssh/tap_key"
+          ssh-keyscan -t ed25519 github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/tap_key -o IdentitiesOnly=yes"
           tag="${GITHUB_REF_NAME}"
           url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
-          sha=$(curl -sL --fail "$url" | shasum -a 256 | cut -d' ' -f1)
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/199-biotechnologies/homebrew-tap.git" tap
+          sha=$(curl -sL --fail "$url" | sha256sum | cut -d' ' -f1)
+          git clone git@github.com:199-biotechnologies/homebrew-tap.git tap
           cd tap
           sed -i -E "s|^  url \".*\"$|  url \"${url}\"|" Formula/ritalin.rb
           sed -i -E "s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" Formula/ritalin.rb
           grep -F "refs/tags/${tag}.tar.gz" Formula/ritalin.rb
           grep -F "${sha}" Formula/ritalin.rb
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Formula already at ${tag}; nothing to push."
+            exit 0
+          fi
+          git config user.name "ritalin-release-bot"
+          git config user.email "bot@paperfoot.com"
           git commit -am "ritalin ${tag}"
           git push

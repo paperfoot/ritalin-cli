@@ -50,7 +50,7 @@ These exist to keep ritalin small and load-bearing:
 
 1. Bump `version` in `Cargo.toml` and commit (`chore: bump to X.Y.Z`).
 2. Tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
-3. The Release workflow builds the four target binaries, publishes to crates.io, and bumps `Formula/ritalin.rb` in [199-biotechnologies/homebrew-tap](https://github.com/199-biotechnologies/homebrew-tap). The formula bump needs the `HOMEBREW_TAP_TOKEN` repo secret (a fine-grained PAT with contents write access on the tap); without it the job emits a warning and the formula must be bumped by hand.
+3. The Release workflow builds the four target binaries, publishes to crates.io, and bumps `Formula/ritalin.rb` in [199-biotechnologies/homebrew-tap](https://github.com/199-biotechnologies/homebrew-tap). The cross-repo push uses the `HOMEBREW_TAP_DEPLOY_KEY` secret — an SSH deploy key whose public half is registered (write-enabled) on the tap. It's already configured; if it's ever rotated, generate a new `ed25519` keypair, add the public half to the tap's deploy keys with write access, and store the private half as the secret. Without the secret the job emits a warning and the formula must be bumped by hand.
 
 A release isn't done until GitHub Releases, crates.io, **and** the tap serve the same version. A stale channel ships a binary that contradicts `SKILL.md` — the exact doc/build drift this tool exists to catch.
 
