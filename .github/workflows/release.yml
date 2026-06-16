@@ -70,47 +70,8 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
 
-  bump-homebrew:
-    name: Bump Homebrew formula
-    needs: [build, publish-crate]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check for deploy key
-        id: cred
-        env:
-          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
-        run: |
-          if [ -n "$DEPLOY_KEY" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::HOMEBREW_TAP_DEPLOY_KEY secret not set — Formula/ritalin.rb in 199-biotechnologies/homebrew-tap must be bumped manually"
-          fi
-
-      - name: Update formula to ${{ github.ref_name }}
-        if: steps.cred.outputs.present == 'true'
-        env:
-          DEPLOY_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/tap_key"
-          chmod 600 "$HOME/.ssh/tap_key"
-          ssh-keyscan -t ed25519 github.com >> "$HOME/.ssh/known_hosts" 2>/dev/null
-          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/tap_key -o IdentitiesOnly=yes"
-          tag="${GITHUB_REF_NAME}"
-          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${tag}.tar.gz"
-          sha=$(curl -sL --fail "$url" | sha256sum | cut -d' ' -f1)
-          git clone git@github.com:199-biotechnologies/homebrew-tap.git tap
-          cd tap
-          sed -i -E "s|^  url \".*\"$|  url \"${url}\"|" Formula/ritalin.rb
-          sed -i -E "s|^  sha256 \".*\"$|  sha256 \"${sha}\"|" Formula/ritalin.rb
-          grep -F "refs/tags/${tag}.tar.gz" Formula/ritalin.rb
-          grep -F "${sha}" Formula/ritalin.rb
-          if git diff --quiet; then
-            echo "Formula already at ${tag}; nothing to push."
-            exit 0
-          fi
-          git config user.name "ritalin-release-bot"
-          git config user.email "bot@paperfoot.com"
-          git commit -am "ritalin ${tag}"
-          git push
+  # Homebrew is bumped separately by the self-polling workflow
+  # (.github/workflows/bump-ritalin.yml) in paperfoot/homebrew-tap — releases
+  # here can't push there cross-repo, so the tap polls this repo's latest
+  # release every 6h. For an instant bump after a release:
+  #   gh workflow run bump-ritalin.yml -R paperfoot/homebrew-tap

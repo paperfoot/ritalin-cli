@@ -77,7 +77,7 @@ This is not a motivation problem. It is a **contract failure under information a
 
 ```bash
 # macOS / Linux via Homebrew
-brew tap 199-biotechnologies/tap
+brew tap paperfoot/tap
 brew install ritalin
 
 # Or via Cargo

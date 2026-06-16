@@ -50,7 +50,8 @@ These exist to keep ritalin small and load-bearing:
 
 1. Bump `version` in `Cargo.toml` and commit (`chore: bump to X.Y.Z`).
 2. Tag and push: `git tag vX.Y.Z && git push origin main vX.Y.Z`.
-3. The Release workflow builds the four target binaries, publishes to crates.io, and bumps `Formula/ritalin.rb` in [199-biotechnologies/homebrew-tap](https://github.com/199-biotechnologies/homebrew-tap). The cross-repo push uses the `HOMEBREW_TAP_DEPLOY_KEY` secret — an SSH deploy key whose public half is registered (write-enabled) on the tap. It's already configured; if it's ever rotated, generate a new `ed25519` keypair, add the public half to the tap's deploy keys with write access, and store the private half as the secret. Without the secret the job emits a warning and the formula must be bumped by hand.
+3. The Release workflow builds the four target binaries and publishes to crates.io.
+4. Homebrew updates itself. The tap [paperfoot/homebrew-tap](https://github.com/paperfoot/homebrew-tap) runs `bump-ritalin.yml`, which polls this repo's latest release every 6h and bumps `Formula/ritalin.rb` with its own `GITHUB_TOKEN` (releases here can't push there cross-repo). For an instant bump after tagging: `gh workflow run bump-ritalin.yml -R paperfoot/homebrew-tap`.
 
 A release isn't done until GitHub Releases, crates.io, **and** the tap serve the same version. A stale channel ships a binary that contradicts `SKILL.md` — the exact doc/build drift this tool exists to catch.
 
