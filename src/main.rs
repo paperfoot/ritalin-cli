@@ -81,10 +81,7 @@ fn main() {
             all,
             stale_only,
         } => commands::prove::run(ctx, id, cmd, all, stale_only),
-        Commands::Gate {
-            hook_mode,
-            summary,
-        } => commands::gate::run(ctx, hook_mode, summary),
+        Commands::Gate { hook_mode, summary } => commands::gate::run(ctx, hook_mode, summary),
         Commands::Seed { manifest, force } => commands::seed::run(ctx, manifest, force),
         Commands::Status => commands::status::run(ctx),
         Commands::ExportContract => commands::export_contract::run(ctx),

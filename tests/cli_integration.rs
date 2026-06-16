@@ -1318,7 +1318,10 @@ fn prove_all_runs_every_obligation() {
         .current_dir(dir)
         .output()
         .unwrap();
-    assert!(out.status.success(), "prove --all should exit 0 when all pass");
+    assert!(
+        out.status.success(),
+        "prove --all should exit 0 when all pass"
+    );
 
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     let summary = &json["data"]["summary"];
@@ -1668,14 +1671,7 @@ fn literal_regex_without_kind_is_rejected() {
 
     // Default kind is "other"; --regex requires --kind literal_regex.
     ritalin()
-        .args([
-            "add",
-            "missing kind",
-            "--regex",
-            "alpha",
-            "--file",
-            "a.txt",
-        ])
+        .args(["add", "missing kind", "--regex", "alpha", "--file", "a.txt"])
         .current_dir(dir)
         .assert()
         .failure();

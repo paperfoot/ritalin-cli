@@ -68,10 +68,7 @@ pub fn evaluate<'a>(
 
     for ob in obligations {
         let expected_proof_hash = evidence::proof_hash(&ob.proof_cmd);
-        let scope_hash = scope_hashes
-            .get(&ob.id)
-            .map(String::as_str)
-            .unwrap_or(""); // missing scope hash → cannot discharge
+        let scope_hash = scope_hashes.get(&ob.id).map(String::as_str).unwrap_or(""); // missing scope hash → cannot discharge
         let discharged = evidence_by_id
             .get(&ob.id)
             .map(|recs| evidence::is_discharged(recs, &expected_proof_hash, scope_hash))

@@ -47,8 +47,7 @@ pub fn run(ctx: Ctx) -> Result<(), AppError> {
         let recs = evidence_index.get(&ob.id);
         let expected_ph = evidence::proof_hash(&ob.proof_cmd);
         let scope = scope_hashes.get(&ob.id).map(String::as_str).unwrap_or("");
-        let evidence_status =
-            evidence::classify(recs.map(Vec::as_slice), &expected_ph, scope);
+        let evidence_status = evidence::classify(recs.map(Vec::as_slice), &expected_ph, scope);
         let discharged = matches!(evidence_status, evidence::EvidenceState::Passed);
         let last_exit = recs.and_then(|r| r.last().map(|e| e.exit_code));
 
