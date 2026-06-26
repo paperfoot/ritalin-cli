@@ -17,7 +17,7 @@ If you have not read or run it in this turn, do not state it as fact. That inclu
 
 ## The four commands you'll use
 
-1. **Init** — say what "done" looks like:
+1. **Init** — say what "done" looks like. Write the outcome as the goal the work serves (who it's for, what it must let them do), not a restatement of the prompt:
    ```
    ritalin init --outcome "User can save and reload notification settings"
    ```
