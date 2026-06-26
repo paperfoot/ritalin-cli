@@ -164,6 +164,9 @@ pub fn run() {
                     "hook_mode": "Reads stop_hook_active from stdin JSON. On block, prints {\"decision\":\"block\",\"reason\":\"...\"} to stdout. On pass, exits 0 with empty stdout. Removes .task-incomplete on pass.",
                     "cli_mode": "Returns framework JSON envelope or human-readable report. Exits non-zero on fail.",
                     "summary_mode": "Single line stdout, exits non-zero on fail."
+                },
+                "env": {
+                    "RITALIN_GATE": "Hook-mode opt-out. When set to 0/off/false/no/disable/disabled (case-insensitive), `gate --hook-mode` exits 0 with empty stdout and leaves the contract untouched — so a one-shot reviewer/auditor/CI run that does NOT own the contract stops cleanly instead of being hijacked into the gate. Unset (or any other value) keeps the gate active. Only affects hook mode; manual `ritalin gate` always reports the true verdict."
                 }
             },
             "seed": {

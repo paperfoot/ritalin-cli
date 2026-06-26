@@ -3,7 +3,11 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 fn ritalin() -> Command {
-    Command::cargo_bin("ritalin").unwrap()
+    let mut cmd = Command::cargo_bin("ritalin").unwrap();
+    // Hermetic by default: never inherit an ambient RITALIN_GATE opt-out, which
+    // would disable hook-mode gating and defeat these fail-closed attack tests.
+    cmd.env_remove("RITALIN_GATE");
+    cmd
 }
 
 fn init_in(dir: &std::path::Path) {
@@ -256,6 +260,31 @@ fn hook_mode_corrupt_evidence_blocks() {
             .unwrap()
             .contains("could not verify the contract")
     );
+    assert!(dir.join(".task-incomplete").exists());
+}
+
+#[test]
+fn hook_mode_env_disable_short_circuits_before_state_read() {
+    // The opt-out returns before any contract/evidence read, so even an
+    // unreadable contract that would otherwise fail-closed (block) stops
+    // cleanly under RITALIN_GATE=0 — without mutating the marker.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "test", "true");
+    std::fs::write(dir.join(".ritalin/evidence.jsonl"), "not json\n").unwrap();
+
+    let output = ritalin()
+        .args(["gate", "--hook-mode"])
+        .env("RITALIN_GATE", "0")
+        .write_stdin("{}")
+        .current_dir(dir)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert!(output.stdout.is_empty());
     assert!(dir.join(".task-incomplete").exists());
 }
 

@@ -30,6 +30,24 @@ fn print_hook_block(reason: String) {
     println!("{}", output::safe_json_string(&decision));
 }
 
+/// Returns true if `RITALIN_GATE` is explicitly set to a disable value
+/// (`0`, `off`, `false`, `no`, `disable`, `disabled` — case-insensitive).
+///
+/// This lets a session opt OUT of the Stop-hook gate. One-shot reviewers,
+/// auditors, and CI runs that do not own the contract set `RITALIN_GATE=0` so
+/// the gate stops them cleanly instead of hijacking their termination into
+/// `ritalin prove` bookkeeping. Unset leaves the gate active, so existing Stop
+/// hooks keep working unchanged.
+fn hook_disabled_by_env() -> bool {
+    match std::env::var("RITALIN_GATE") {
+        Ok(v) => matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "0" | "off" | "false" | "no" | "disable" | "disabled"
+        ),
+        Err(_) => false,
+    }
+}
+
 fn read_stop_hook_active() -> bool {
     if std::io::stdin().is_terminal() {
         return false;
@@ -48,7 +66,12 @@ fn read_stop_hook_active() -> bool {
 }
 
 pub fn run(ctx: Ctx, hook_mode: bool, summary: bool) -> Result<(), AppError> {
-    if hook_mode && read_stop_hook_active() {
+    // `RITALIN_GATE=0` (or off/false/no/disable/disabled) opts this session out of the
+    // gate: a non-owning reviewer/auditor/CI run stops cleanly instead of being
+    // hijacked. Checked before reading stdin so it short-circuits regardless of
+    // the hook payload. Only affects hook mode — a manual `ritalin gate` always
+    // reports the true verdict.
+    if hook_mode && (hook_disabled_by_env() || read_stop_hook_active()) {
         return Ok(());
     }
 

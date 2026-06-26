@@ -83,3 +83,7 @@ Read the `reason` field — it names the obligation and the command to run. Run 
 - `ritalin gate --summary` — one-line shell-friendly verdict for hooks/CI.
 - `ritalin prove --all --stale-only` — re-prove only what changed since last run. Idiomatic after a commit.
 - `ritalin export-contract` — paste the output into a subagent prompt before delegating.
+
+## If you're a reviewer, not the owner
+
+If you're a one-shot reviewer, auditor, or CI step running inside a repo that happens to have a `.ritalin/` folder, you don't own that contract — and a Stop hook fired at the end of your turn would otherwise hijack you into running `ritalin prove`. Set `RITALIN_GATE=0` for your session (values `0/off/false/no/disable/disabled`) so the gate lets you stop cleanly without touching the contract. It only suppresses hook mode; `ritalin gate` run by hand still reports the real verdict.

@@ -181,6 +181,34 @@ Add to `.claude/settings.json` (project) or `~/.claude/settings.json` (global):
 
 The gate reads `stop_hook_active` from stdin to break out of forced-continuation cycles. No infinite loops. No babysitting.
 
+### Scoping the gate (reviewers, CI, other agents)
+
+The gate is meant for the agent that **owns** the work. A one-shot reviewer, an
+auditor, or a CI step that merely runs inside a repo that has a `.ritalin/`
+folder does not own the contract — and a Stop hook can't tell the difference
+from its payload. Set `RITALIN_GATE=0` to opt such a session out: in hook mode
+the gate then exits cleanly without blocking and without touching the contract.
+
+```bash
+RITALIN_GATE=0 codex exec -m gpt-5.5 < review-prompt.md   # reviewer: never gated
+```
+
+Accepted disable values (case-insensitive): `0`, `off`, `false`, `no`,
+`disable`, `disabled`. Unset — or any other value — leaves the gate active, so
+existing Stop hooks keep working unchanged. This only affects hook mode; a
+manual `ritalin gate` always reports the true verdict.
+
+If you wire the gate into another agent's global Stop hook (e.g. Codex), flip
+it to **opt-in** so it never hijacks unrelated runs. Note `RITALIN_GATE=1` is
+not a binary-level signal — to the gate, `1` is just "any other value" (active).
+Make it an owner signal in the hook wrapper itself:
+
+```bash
+# Stop hook: gate only sessions that explicitly claimed the contract
+[ "$RITALIN_GATE" = 1 ] || exit 0
+exec ritalin gate --hook-mode
+```
+
 ## Features
 
 | | What it does |

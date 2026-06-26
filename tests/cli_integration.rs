@@ -4,7 +4,13 @@ use std::path::Path;
 use tempfile::TempDir;
 
 fn ritalin() -> Command {
-    Command::cargo_bin("ritalin").unwrap()
+    let mut cmd = Command::cargo_bin("ritalin").unwrap();
+    // Hermetic by default: never inherit an ambient RITALIN_GATE opt-out from
+    // the dev/CI shell — that would silently disable hook-mode gating and make
+    // block-expecting tests pass for the wrong reason. Tests that exercise the
+    // env var set it explicitly with `.env(...)`, which overrides this.
+    cmd.env_remove("RITALIN_GATE");
+    cmd
 }
 
 fn init_in(dir: &Path) {
@@ -159,6 +165,109 @@ fn hook_mode_allows_stop_when_all_proved() {
         .assert()
         .success()
         .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn hook_mode_env_disable_skips_gate() {
+    // A failing contract that would normally block...
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    // ...is opted out via RITALIN_GATE=0: stop cleanly, no block, marker intact.
+    ritalin()
+        .args(["gate", "--hook-mode"])
+        .env("RITALIN_GATE", "0")
+        .write_stdin("{}")
+        .current_dir(dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+
+    // Opting out must not discharge the contract — the marker stays.
+    assert!(dir.join(".task-incomplete").exists());
+}
+
+#[test]
+fn hook_mode_env_disable_is_case_insensitive() {
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    for val in ["off", "FALSE", "No", "disable", "Disabled"] {
+        ritalin()
+            .args(["gate", "--hook-mode"])
+            .env("RITALIN_GATE", val)
+            .write_stdin("{}")
+            .current_dir(dir)
+            .assert()
+            .success()
+            .stdout(predicate::str::is_empty());
+    }
+}
+
+#[test]
+fn hook_mode_env_truthy_still_blocks() {
+    // RITALIN_GATE=1 means "this session owns the contract" — gate still fires.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    ritalin()
+        .args(["gate", "--hook-mode"])
+        .env("RITALIN_GATE", "1")
+        .write_stdin("{}")
+        .current_dir(dir)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"decision\""))
+        .stdout(predicate::str::contains("\"block\""));
+}
+
+#[test]
+fn hook_mode_env_non_disable_values_stay_active() {
+    // Only the documented disable tokens opt out. Everything else — empty,
+    // whitespace, "TRUE", "on", "00", "2", "yes" — leaves the gate blocking.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    for val in ["", "  ", "TRUE", "on", "00", "2", "yes"] {
+        ritalin()
+            .args(["gate", "--hook-mode"])
+            .env("RITALIN_GATE", val)
+            .write_stdin("{}")
+            .current_dir(dir)
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("\"block\""));
+    }
+}
+
+#[test]
+fn cli_mode_ignores_env_disable() {
+    // RITALIN_GATE only suppresses HOOK mode. A manual `ritalin gate` still
+    // reports the true verdict and exits non-zero on open obligations.
+    let tmp = TempDir::new().unwrap();
+    let dir = tmp.path();
+
+    init_in(dir);
+    add_in(dir, "undone", "false");
+
+    ritalin()
+        .args(["gate"])
+        .env("RITALIN_GATE", "0")
+        .current_dir(dir)
+        .assert()
+        .failure();
 }
 
 #[test]
