@@ -45,9 +45,9 @@ If you have not read or run it in this turn, do not state it as fact. That inclu
 
 ## Run `ritalin agent-info` once at session start
 
-It dumps the full command and flag manifest in JSON. Don't guess flags from this skill — read the manifest.
+It dumps the full command and flag manifest in JSON. Don't guess flags — read the manifest.
 
-## Three rules that prevent the common failure modes
+## Three rules
 
 1. **One obligation per behavior, not per file.** If a feature needs files A and B working together, that's ONE `add` with `--depends-on A,B` — not two adds. Counting obligations by file count creates sprawl and dilutes the contract.
 

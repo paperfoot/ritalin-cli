@@ -133,8 +133,6 @@ The **SKILL.md** (installed via `ritalin skill install`) is the prescription. It
 - **Structure obligations by kind** — user paths, integration, persistence, failure paths, security
 - **Use the ecosystem** — `search`, `gh`, `engram` are tools, not decorations
 
-The binary stays lean. The skill gets smarter. That's the design.
-
 ## Composing with the ecosystem
 
 ritalin's proof commands can shell out to any CLI. The obligations aren't limited to test runners — they can verify anything:
@@ -156,7 +154,7 @@ ritalin add "Pattern matches community best practice" \
   --kind code_referenced
 ```
 
-Any CLI that returns exit code 0/1 is a valid proof command. The ecosystem grows; ritalin composes with it automatically.
+Any CLI that returns exit code 0/1 is a valid proof command.
 
 ## Hook into Claude Code
 
@@ -270,7 +268,7 @@ We tested ritalin on [ARC-AGI-3](https://arcprize.org/arc-agi/3), the hardest in
 | **Documentation** | Score file | Exploration notes + hypothesis log + evidence trail |
 | **Obligations proved** | N/A | 4/4 |
 
-Same score, different value. Both agents hit the same wall (level 4's zHk teleport mechanic). The baseline was more action-efficient. The ritalin agent was faster and left behind a complete evidence trail — exploration notes, hypotheses, and proved obligations — making the work handoff-ready and debuggable. The ritalin agent also exhibited classic ADHD hyperfocus drift: documented obligations late, but the gate ensured they got proved.
+Both agents hit the same wall (level 4's zHk teleport mechanic). The baseline was more action-efficient. The ritalin agent was faster and left behind a complete evidence trail — exploration notes, hypotheses, and proved obligations — making the work handoff-ready and debuggable. The ritalin agent also exhibited classic ADHD hyperfocus drift: documented obligations late, but the gate ensured they got proved.
 
 Full findings: [bench/arc-agi-3/FINDINGS.md](bench/arc-agi-3/FINDINGS.md)
 
