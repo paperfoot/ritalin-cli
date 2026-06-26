@@ -1,6 +1,6 @@
 [package]
 name = "ritalin"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 rust-version = "1.85"
 description = "Executive function for AI coding agents. Focus their intelligence, ground their work, stop the avoidable mistakes."
